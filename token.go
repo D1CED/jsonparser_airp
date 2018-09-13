@@ -1,4 +1,4 @@
-package airp
+package jsonparser_airp
 
 type tokenType uint8
 

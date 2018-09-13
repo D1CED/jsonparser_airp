@@ -1,4 +1,4 @@
-// Jannis Hoffmann, 20. 6. 2018
+// Jannis M. Hoffmann, 13. 9. 2018
 
 /*
 Package airp encodes and decodes JSON.
@@ -11,6 +11,5 @@ Node fulfills the json.Marshaler/Unmarshaler interface.
 
     TODO
     -   Improve error handling.
-    -   Children []Node => []*Node
 */
-package airp // import "github.com/D1CED/jsonparser/airp"
+package jsonparser_airp // import "github.com/d1ced/jsonparser-airp"

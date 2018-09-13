@@ -1,4 +1,4 @@
-package airp
+package jsonparser_airp
 
 import (
 	"io/ioutil"
@@ -127,7 +127,7 @@ func TestFile(t *testing.T) {
 				{key: "d", jsonType: 6, value: "", Children: []Node{
 					{key: "f", jsonType: 4, value: "Hello there!"}}},
 				{key: "e", jsonType: 2, value: "false"}}}}}}}
-	data, err := ioutil.ReadFile("../testfiles/test.json")
+	data, err := ioutil.ReadFile("testfiles/test.json")
 	if err != nil {
 		t.Error(err)
 	}

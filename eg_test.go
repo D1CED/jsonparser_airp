@@ -1,9 +1,9 @@
-package airp_test
+package jsonparser_airp_test
 
 import (
 	"fmt"
 
-	"." // "github.com/D1CED/jsonparser/airp"
+	airp "github.com/d1ced/jsonparser-airp"
 )
 
 func ExampleNode_MarshalJSON() {

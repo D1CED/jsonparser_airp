@@ -1,4 +1,4 @@
-package airp
+package jsonparser_airp
 
 // Lex reads in a json string and generate tokens for the parser.
 func lex(data string) <-chan token {
