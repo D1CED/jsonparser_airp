@@ -7,9 +7,9 @@ import (
 )
 
 func ExampleNode_MarshalJSON() {
-	n := airp.StandaloneNode("", airp.Object, "")
-	m := airp.StandaloneNode("Num", airp.Number, "3.125e-4")
-	o := airp.StandaloneNode("Str", airp.String, "Hello, World!")
+	n := airp.StandaloneNode("", "", airp.Object)
+	m := airp.StandaloneNode("Num", "3.125e-4", airp.Number)
+	o := airp.StandaloneNode("Str", "Hello, World!", airp.String)
 	n.Children = append(n.Children, *m, *o)
 	data, _ := n.MarshalJSON()
 	fmt.Printf("%s", data)

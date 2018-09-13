@@ -27,25 +27,31 @@ type lexer struct {
 type lexFunc func(*lexer) lexFunc
 
 func noneMode(l *lexer) lexFunc {
+	fwd := func() {
+		l.pos++
+		l.start = l.pos
+	}
+
 	if l.start >= len(l.data) {
 		return nil
 	}
 	switch l.data[l.pos] {
 	case ' ', '\t', '\n', '\r':
-		l.pos++
-		l.start = l.pos
+		fwd()
 		return noneMode
 	case '{', '}', '[', ']', ',', ':':
 		l.out <- newToken(l.data[l.pos])
-		l.pos++
-		l.start = l.pos
+		fwd()
 		return noneMode
 	case '"':
-		l.pos++
-		l.start = l.pos
+		fwd()
 		return stringMode
 	case '-', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		return numberMode
+	case '0':
+		l.out <- token{numberToken, "0"}
+		fwd()
+		return noneMode
 	default:
 		return otherMode
 	}
