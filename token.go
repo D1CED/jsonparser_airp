@@ -1,5 +1,7 @@
 package jsonparser_airp
 
+import "fmt"
+
 type tokenType uint8
 
 const (
@@ -18,26 +20,27 @@ const (
 )
 
 type token struct {
-	Type  tokenType
-	Value string
+	Type     tokenType
+	Value    string
+	Position [2]int
 }
 
-func newToken(b byte) token {
+func newToken(b byte, r, c int) token {
 	switch b {
 	case '{':
-		return token{Type: objectOToken}
+		return token{Type: objectOToken, Position: [2]int{r, c}}
 	case '}':
-		return token{Type: objectCToken}
+		return token{Type: objectCToken, Position: [2]int{r, c}}
 	case '[':
-		return token{Type: arrayOToken}
+		return token{Type: arrayOToken, Position: [2]int{r, c}}
 	case ']':
-		return token{Type: arrayCToken}
+		return token{Type: arrayCToken, Position: [2]int{r, c}}
 	case ':':
-		return token{Type: colonToken}
+		return token{Type: colonToken, Position: [2]int{r, c}}
 	case ',':
-		return token{Type: commaToken}
+		return token{Type: commaToken, Position: [2]int{r, c}}
 	default:
-		return token{Value: string(b)}
+		return token{Value: string(b), Position: [2]int{r, c}}
 	}
 }
 
@@ -71,4 +74,12 @@ func (t token) String() string {
 	default:
 		return "lex-unkown"
 	}
+}
+
+// Error implements the error interface for token.
+func (t token) Error() string {
+	if t.Type == errToken {
+		return fmt.Sprintf("%d:%d %v", t.Position[0], t.Position[1], t.Value)
+	}
+	return ""
 }

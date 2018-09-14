@@ -52,14 +52,18 @@ func TestLexer(t *testing.T) {
 	}
 	for _, test := range tests {
 		ch := lex(test.have)
+		first := true
 		for _, w := range test.want {
 			tk := <-ch
-			if tk != w {
-				t.Errorf("have %v, got %s, want %s", test.have, tk, w)
+			if tk.Type != w.Type || tk.Value != w.Value {
+				t.Errorf("have %v, got %s, want %s", test.have, tk.String(), w)
 			}
+			if !first && tk.Position == [2]int{} {
+				t.Errorf("token %s is missing position", tk.String())
+			}
+			first = false
 		}
-		tk, ok := <-ch
-		if ok {
+		if tk, ok := <-ch; ok {
 			t.Errorf("expected nothing, got %s", tk)
 		}
 	}
@@ -103,8 +107,7 @@ func TestParser(t *testing.T) {
 		}},
 	}
 	for _, test := range tests {
-		ch := lex(test.have)
-		ast, err := parse(ch)
+		ast, err := parse(lex(test.have))
 		if err != nil {
 			t.Error(err)
 		}
