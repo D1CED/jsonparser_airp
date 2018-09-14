@@ -46,6 +46,11 @@ func noneMode(l *lexer) lexFunc {
 		return stringMode
 	case '-', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		return numberMode
+	case '0':
+		l.out <- token{Type: numberToken, Value: "0"}
+		l.pos++
+		l.start = l.pos
+		return noneMode
 	default:
 		return otherMode
 	}

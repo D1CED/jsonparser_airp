@@ -44,14 +44,18 @@ func TestLexer(t *testing.T) {
 			{Type: arrayCToken},
 			{Type: objectCToken},
 		}},
+		{`[0]`, []token{
+			{Type: arrayOToken},
+			{Type: numberToken, Value: "0"},
+			{Type: arrayCToken},
+		}},
 	}
 	for _, test := range tests {
 		ch := lex(test.have)
 		for _, w := range test.want {
 			tk := <-ch
 			if tk != w {
-				t.Errorf("have %v, got %s, want %s",
-					test.have, tk, test.want)
+				t.Errorf("have %v, got %s, want %s", test.have, tk, w)
 			}
 		}
 		tk, ok := <-ch
@@ -89,6 +93,12 @@ func TestParser(t *testing.T) {
 					{jsonType: Bool, value: "true"},
 					{jsonType: Null},
 				}},
+			},
+		}},
+		{`[0]`, Node{
+			jsonType: Array,
+			Children: []Node{
+				{jsonType: Number, value: "0"},
 			},
 		}},
 	}
