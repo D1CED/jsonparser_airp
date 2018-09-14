@@ -1,6 +1,9 @@
 package jsonparser_airp
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type ParseError struct {
 	msg           string
@@ -39,11 +42,17 @@ func parentType(n *Node) JSONType {
 }
 
 func currentKey(n *Node) string {
-	if n == nil {
-		return ""
+	ss := make([]string, 0, 4)
+	for o := n; o != nil; o = o.parent {
+		if o.key != "" {
+			ss = append(ss, o.key)
+		} else if o.jsonType == Array {
+			ss = append(ss, fmt.Sprint(len(o.Children)-1))
+		}
 	}
-	if n.jsonType == Array {
-		return currentKey(n.parent) + "/" + fmt.Sprint(len(n.Children)-1)
+	rr := make([]string, len(ss))
+	for i, s := range ss {
+		rr[len(ss)-i-1] = s
 	}
-	return currentKey(n.parent) + "/" + n.key
+	return strings.Join(rr, ".")
 }
