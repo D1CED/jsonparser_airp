@@ -69,6 +69,39 @@ func TestLexer(t *testing.T) {
 	}
 }
 
+func TestLexeErr(t *testing.T) {
+	tests := []struct {
+		have string
+		want token
+	}{
+		{`{"a": nul}`, token{
+			Value:    "nul",
+			Position: [2]int{0, 6},
+		}},
+		{`{"a": "\"}`, token{
+			Value:    `"\"}`,
+			Position: [2]int{0, 6},
+		}},
+		{`{"a". false}`, token{
+			Value:    ".",
+			Position: [2]int{0, 4},
+		}},
+		{"{\"a\"\n <garbage>}", token{
+			Value:    "<garbage>",
+			Position: [2]int{1, 1},
+		}},
+	}
+	for _, test := range tests {
+		var have token
+		for tk := range lex(test.have) {
+			have = tk
+		}
+		if have != test.want {
+			t.Errorf("got %v, want %v, for %v", have.Error(), test.want, test.have)
+		}
+	}
+}
+
 func TestParser(t *testing.T) {
 	tests := []struct {
 		have string
@@ -113,6 +146,60 @@ func TestParser(t *testing.T) {
 		}
 		if !eqNode(ast, &test.want) {
 			t.Errorf("for %v got %v", test.have, ast)
+		}
+	}
+}
+
+func TestParseErr(t *testing.T) {
+	tests := []struct {
+		have string
+		want ParseError
+	}{
+		{`{"a": nul}`, ParseError{
+			msg:        "value",
+			Token:      token{Value: "nul", Position: [2]int{0, 6}},
+			before:     token{Type: colonToken, Position: [2]int{0, 4}},
+			ParentType: Object,
+			Key:        "a",
+		}},
+		{`{"b": "\"}`, ParseError{
+			msg:        "value",
+			Token:      token{Value: `"\"}`, Position: [2]int{0, 6}},
+			before:     token{Type: colonToken, Position: [2]int{0, 4}},
+			ParentType: Object,
+			Key:        "b",
+		}},
+		{`{"a":[],"b":{"a". false}}`, ParseError{
+			msg:        "colon",
+			Token:      token{Value: ".", Position: [2]int{0, 17}},
+			before:     token{Type: stringToken, Value: "a", Position: [2]int{0, 14}},
+			ParentType: Object,
+			Key:        "b.a",
+		}},
+		{"{\"very_long\"\n <garbage>}", ParseError{
+			msg:        "colon",
+			Token:      token{Value: "<garbage>", Position: [2]int{1, 1}},
+			before:     token{Type: stringToken, Value: "very_long", Position: [2]int{0, 1}},
+			ParentType: Object,
+			Key:        "very_long",
+		}},
+		{"{", ParseError{
+			msg:        "key",
+			before:     token{Type: objectOToken, Position: [2]int{0, 0}},
+			ParentType: Object,
+		}},
+		{`[{"b":}]`, ParseError{
+			msg:        "value",
+			Token:      token{Type: objectCToken, Position: [2]int{0, 6}},
+			before:     token{Type: colonToken, Position: [2]int{0, 5}},
+			ParentType: Object,
+			Key:        "0.b",
+		}},
+	}
+	for _, test := range tests {
+		_, err := parse(lex(test.have))
+		if *(err.(*ParseError)) != test.want {
+			t.Errorf("got %v, want %v, for %v", (err.(*ParseError)), test.want, test.have)
 		}
 	}
 }

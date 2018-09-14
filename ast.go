@@ -9,6 +9,7 @@ import (
 // JSONType is an enum for any JSON-types
 type JSONType uint8
 
+//go:generate stringer -type JSONType
 const (
 	Error JSONType = iota
 	Null

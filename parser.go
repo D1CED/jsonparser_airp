@@ -1,9 +1,17 @@
 package jsonparser_airp
 
-import (
-	"fmt"
-	"strconv"
-)
+import "strconv"
+
+// parser is a state machine creating an ast from lex tokens
+// the parser is only allowed to cancel it if recieves an error from the lexer
+type parser struct {
+	in   <-chan token
+	init parseFunc
+	ast  *Node
+	prev token
+}
+
+type parseFunc func(p *parser) (parseFunc, error)
 
 // Parse reads tokens from a channel and generates a ast.
 // The returned node is the root node of the ast.
@@ -19,35 +27,31 @@ func parse(ch <-chan token) (*Node, error) {
 	return p.ast, err
 }
 
-type parser struct {
-	in   <-chan token
-	init parseFunc
-	ast  *Node
-}
-
-type parseFunc func(p *parser) (parseFunc, error)
+// parseFunc's
 
 func expektKey(p *parser) (parseFunc, error) {
 	t := <-p.in
 	if t.Type != stringToken {
-		return nil, fmt.Errorf("expected string, got %v", t)
+		return nil, newParseError("key", p.prev, t, p.ast)
 	}
 	p.ast.key = t.Value
-	t = <-p.in
+	p.prev, t = t, <-p.in
+	defer func() { p.prev = t }()
 	if t.Type != colonToken {
-		return nil, fmt.Errorf("expected colon, got %v", t)
+		return nil, newParseError("colon", p.prev, t, p.ast)
 	}
 	return expektValue, nil
 }
 
 func expektValue(p *parser) (parseFunc, error) {
 	t := <-p.in
+	defer func() { p.prev = t }()
 	switch t.Type {
 	case numberToken:
 		p.ast.jsonType = Number
 		// number check
 		if _, err := strconv.ParseFloat(t.Value, 64); err != nil {
-			return nil, err
+			return nil, newParseError("number", p.prev, t, p.ast)
 		}
 		p.ast.value = t.Value
 		return expektDelim, nil
@@ -79,20 +83,20 @@ func expektValue(p *parser) (parseFunc, error) {
 		p.ast = &p.ast.Children[0]
 		return expektKey, nil
 	default:
-		return nil, fmt.Errorf("expected value, got %v", t)
+		return nil, newParseError("value", p.prev, t, p.ast)
 	}
 }
 
 func expektDelim(p *parser) (parseFunc, error) {
 	t, ok := <-p.in
+	defer func() { p.prev = t }()
 	if !ok {
-		// all ok
-		return nil, nil
+		return nil, nil // all OK!
 	}
 	switch t.Type {
 	case commaToken:
 		if p.ast.parent == nil {
-			return nil, fmt.Errorf("not in array or object. got ','")
+			return nil, newParseError("no comma", p.prev, t, p.ast)
 		}
 		if p.ast.parent.jsonType == Array {
 			p.ast.parent.Children = append(p.ast.parent.Children, Node{parent: p.ast.parent})
@@ -104,13 +108,13 @@ func expektDelim(p *parser) (parseFunc, error) {
 			p.ast = &p.ast.parent.Children[len(p.ast.parent.Children)-1]
 			return expektKey, nil
 		}
-		return nil, fmt.Errorf("not in array or object. got ','")
+		return nil, newParseError("no comma", p.prev, t, p.ast)
 	case arrayCToken, objectCToken:
 		if p.ast.parent != nil {
 			p.ast = p.ast.parent
 		}
 		return expektDelim, nil
 	default:
-		return nil, fmt.Errorf("expected delimiter, got %v", t)
+		return nil, newParseError("delimiter", p.prev, t, p.ast)
 	}
 }

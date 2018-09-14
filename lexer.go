@@ -1,5 +1,7 @@
 package jsonparser_airp
 
+// lexer gnereates tokens from json
+// after sending an error token the lexer has to quit
 type lexer struct {
 	mode     lexFunc
 	data     string
@@ -65,11 +67,11 @@ func noneMode(l *lexer) lexFunc {
 }
 
 func stringMode(l *lexer) lexFunc {
-	if l.start >= len(l.data) {
+	if l.pos >= len(l.data) {
 		l.out <- token{
 			Type:     errToken,
-			Value:    l.data[l.start:l.pos],
-			Position: [2]int{l.row, l.col},
+			Value:    l.data[l.start-1:],
+			Position: [2]int{l.row, l.col - 1},
 		}
 		return nil
 	}
@@ -77,11 +79,11 @@ func stringMode(l *lexer) lexFunc {
 		l.out <- token{
 			Type:     stringToken,
 			Value:    l.data[l.start:l.pos],
-			Position: [2]int{l.row, l.col},
+			Position: [2]int{l.row, l.col - 1},
 		}
 		l.pos++
 		l.start = l.pos
-		l.col += l.pos - l.start
+		l.col += l.pos - l.start + 2
 		return noneMode
 	}
 	l.pos++
@@ -89,40 +91,40 @@ func stringMode(l *lexer) lexFunc {
 }
 
 func otherMode(l *lexer) lexFunc {
-	if l.start+len("false") > len(l.data) {
-		l.out <- token{
-			Type:     errToken,
-			Value:    l.data[l.start:],
-			Position: [2]int{l.row, l.col},
-		}
-		l.pos++
-		l.start = l.pos
-		return nil
-	}
-	if l.data[l.start:l.start+len("null")] == "null" {
+	switch {
+	case l.start+len("false") > len(l.data):
+		break
+	case l.data[l.start:l.start+len("null")] == "null":
 		l.out <- token{Type: nullToken, Position: [2]int{l.row, l.col}}
 		l.pos += len("null")
 		l.start = l.pos
 		l.col += len("null")
 		return noneMode
-	}
-	if l.data[l.start:l.start+len("true")] == "true" {
+	case l.data[l.start:l.start+len("true")] == "true":
 		l.out <- token{Type: trueToken, Position: [2]int{l.row, l.col}}
 		l.pos += len("true")
 		l.start = l.pos
 		l.col += len("true")
 		return noneMode
-	}
-	if l.data[l.start:l.start+len("false")] == "false" {
+	case l.data[l.start:l.start+len("false")] == "false":
 		l.out <- token{Type: falseToken, Position: [2]int{l.row, l.col}}
 		l.pos += len("false")
 		l.start = l.pos
 		l.col += len("false")
 		return noneMode
 	}
+	var length int
+outer:
+	for _, rune_ := range l.data[l.start:] {
+		switch rune_ {
+		case ' ', '\t', '\r', '\n', '{', '}', '[', ']', ',', ':':
+			break outer
+		}
+		length++
+	}
 	l.out <- token{
 		Type:     errToken,
-		Value:    l.data[l.start : l.start+1],
+		Value:    l.data[l.start : l.start+length],
 		Position: [2]int{l.row, l.col},
 	}
 	l.pos++

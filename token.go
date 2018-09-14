@@ -56,9 +56,9 @@ func (t token) String() string {
 	case falseToken:
 		return "'false'"
 	case numberToken:
-		return "lex-num_" + string(t.Value)
+		return t.Value
 	case stringToken:
-		return "lex-str_" + string(t.Value)
+		return `"` + t.Value + `"`
 	case commaToken:
 		return "','"
 	case colonToken:
@@ -79,7 +79,7 @@ func (t token) String() string {
 // Error implements the error interface for token.
 func (t token) Error() string {
 	if t.Type == errToken {
-		return fmt.Sprintf("%d:%d %v", t.Position[0], t.Position[1], t.Value)
+		return fmt.Sprintf("%d:%d '%v'", t.Position[0], t.Position[1], t.Value)
 	}
-	return ""
+	return fmt.Sprintf("%d:%d %v", t.Position[0], t.Position[1], t.String())
 }
