@@ -5,6 +5,16 @@ import (
 	"strconv"
 )
 
+type parser struct {
+	// accepts tokes from a lexer
+	in   <-chan token
+	init parseFunc
+	// holds the top of the ast
+	ast *Node
+}
+
+type parseFunc func(p *parser) (parseFunc, error)
+
 // Parse reads tokens from a channel and generates a ast.
 // The returned node is the root node of the ast.
 func parse(ch <-chan token) (*Node, error) {
@@ -19,13 +29,21 @@ func parse(ch <-chan token) (*Node, error) {
 	return p.ast, err
 }
 
-type parser struct {
-	in   <-chan token
-	init parseFunc
-	ast  *Node
+// parseValue is used to create a single self contained Node from a valid
+// json string
+func parseValue(data string) (Node, error) {
+	n, err := parse(lex(data))
+	if err != nil {
+		return Node{}, err
+	}
+	if n.Children != nil || n.jsonType == Error {
+		return Node{}, fmt.Errorf("please provide a valid, single value")
+	}
+	return *n, nil
 }
 
-type parseFunc func(p *parser) (parseFunc, error)
+// the following functions represet the state machine of the parser; they all
+// are parseFunc's
 
 func expektKey(p *parser) (parseFunc, error) {
 	t := <-p.in

@@ -11,6 +11,7 @@ func Valid(data []byte) bool {
 	return err == nil
 }
 
+// TODO(JMH): Create an AST from Go values.
 func NewNode(v interface{}) *Node {
 	return nil
 }

@@ -1,5 +1,15 @@
 package jsonparser_airp
 
+type lexer struct {
+	mode  lexFunc
+	data  string
+	start int
+	pos   int
+	out   chan<- token
+}
+
+type lexFunc func(*lexer) lexFunc
+
 // Lex reads in a json string and generate tokens for the parser.
 func lex(data string) <-chan token {
 	ch := make(chan token, 1)
@@ -16,15 +26,8 @@ func lex(data string) <-chan token {
 	return ch
 }
 
-type lexer struct {
-	mode  lexFunc
-	data  string
-	start int
-	pos   int
-	out   chan<- token
-}
-
-type lexFunc func(*lexer) lexFunc
+// the code below is the state-machine driving the lexer
+// all these functions are lexFunc's
 
 func noneMode(l *lexer) lexFunc {
 	fwd := func() {

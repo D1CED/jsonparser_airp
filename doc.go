@@ -9,7 +9,6 @@ Every non error-node is valid JSON.
 airp is partly comartible with encoding/json.
 Node fulfills the json.Marshaler/Unmarshaler interface.
 
-    TODO
-    -   Improve error handling.
+TODO(JMH): Improve error handling.
 */
-package jsonparser_airp // import "github.com/d1ced/jsonparser-airp"
+package jsonparser_airp // import "github.com/d1ced/jsonparser_airp"
