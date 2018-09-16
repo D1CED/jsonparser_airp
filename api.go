@@ -8,12 +8,10 @@ import (
 // Valid reports whether data is a valid JSON encoding.
 func Valid(data []byte) bool {
 	_, err := parse(lex(string(data)))
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
+// TODO(JMH): Create an AST from Go values.
 func NewNode(v interface{}) *Node {
 	return nil
 }

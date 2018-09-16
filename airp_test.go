@@ -49,12 +49,37 @@ func TestLexer(t *testing.T) {
 			{Type: numberToken, Value: "0"},
 			{Type: arrayCToken},
 		}},
+		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, []token{
+			{Type: objectOToken},
+			{Type: stringToken, Value: "a"},
+			{Type: colonToken},
+			{Type: objectOToken},
+			{Type: objectCToken},
+			{Type: commaToken},
+			{Type: stringToken, Value: "b"},
+			{Type: colonToken},
+			{Type: arrayOToken},
+			{Type: arrayCToken},
+			{Type: commaToken},
+			{Type: stringToken, Value: "c"},
+			{Type: colonToken},
+			{Type: nullToken},
+			{Type: commaToken},
+			{Type: stringToken, Value: "d"},
+			{Type: colonToken},
+			{Type: numberToken, Value: "0"},
+			{Type: commaToken},
+			{Type: stringToken, Value: "e"},
+			{Type: colonToken},
+			{Type: stringToken},
+			{Type: objectCToken},
+		}},
 	}
 	for _, test := range tests {
-		ch := lex(test.have)
+		lexc := lex(test.have)
 		first := true
 		for _, w := range test.want {
-			tk := <-ch
+			tk := <-lexc
 			if tk.Type != w.Type || tk.Value != w.Value {
 				t.Errorf("have %v, got %s, want %s", test.have, tk.String(), w)
 			}
@@ -63,7 +88,7 @@ func TestLexer(t *testing.T) {
 			}
 			first = false
 		}
-		if tk, ok := <-ch; ok {
+		if tk, ok := <-lexc; ok {
 			t.Errorf("expected nothing, got %s", tk)
 		}
 	}
@@ -138,14 +163,21 @@ func TestParser(t *testing.T) {
 				{jsonType: Number, value: "0"},
 			},
 		}},
+		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, Node{
+			jsonType: Object,
+			Children: []Node{
+				{key: "a", jsonType: Object},
+				{key: "b", jsonType: Array},
+				{key: "c", jsonType: Null},
+				{key: "d", jsonType: Number, value: "0"},
+				{key: "e", jsonType: String},
+			},
+		}},
 	}
 	for _, test := range tests {
-		ast, err := parse(lex(test.have))
-		if err != nil {
-			t.Error(err)
-		}
-		if !eqNode(ast, &test.want) {
-			t.Errorf("for %v got %v", test.have, ast)
+		lexc := lex(test.have)
+		if ast, err := parse(lexc); err != nil || !eqNode(ast, &test.want) {
+			t.Errorf("for %v, got %v, with err: %v", test.have, ast, err)
 		}
 	}
 }
@@ -229,7 +261,7 @@ func TestFile(t *testing.T) {
 				{key: "e", jsonType: 2, value: "false"}}}}}}}
 	data, err := ioutil.ReadFile("testfiles/test.json")
 	if err != nil {
-		t.Error(err)
+		t.Fatalf("failed reading golden file 'testfiles/test.json': %v", err)
 	}
 	n, err := parse(lex(string(data)))
 	if err != nil {

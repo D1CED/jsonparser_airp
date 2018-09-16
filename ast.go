@@ -68,7 +68,7 @@ func (n *Node) Value() (interface{}, error) {
 		}
 		return nil, fmt.Errorf("bool-value is not boolen?! '%s'", n.value)
 	case Number:
-		f, err := strconv.ParseFloat(string(n.value), 64)
+		f, err := strconv.ParseFloat(n.value, 64)
 		if err != nil {
 			return 0, fmt.Errorf("js to Go number '%v' conversion failed: %v", n.value, err)
 		}
@@ -108,7 +108,7 @@ func (n *Node) format(prefix, postfix, commaSep, colonSep string, level int) (st
 	case Bool, Number:
 		return n.value, nil
 	case String:
-		return "\"" + n.value + "\"", nil
+		return `"` + n.value + `"`, nil
 	case Array:
 		if len(n.Children) == 0 {
 			return strings.Repeat(prefix, level) + "[]", nil
@@ -173,7 +173,10 @@ func (n *Node) format(prefix, postfix, commaSep, colonSep string, level int) (st
 
 // String formats an ast as valid JSON with few whitspace.
 func (n *Node) String() string {
-	s, _ := n.format("", "", "", "", 0)
+	s, err := n.format("", "", "", "", 0)
+	if err != nil {
+		return ""
+	}
 	return s
 }
 
@@ -219,7 +222,7 @@ func eqNode(a, b *Node) bool {
 
 // StandaloneNode creates a new Node from given arguments meant for
 // modification of an existing ast.
-func StandaloneNode(k string, t JSONType, v string) *Node {
+func StandaloneNode(k, v string, t JSONType) *Node {
 	return &Node{
 		key:      k,
 		jsonType: t,
