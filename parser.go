@@ -5,21 +5,23 @@ import "strconv"
 // parser is a state machine creating an ast from lex tokens
 // the parser is only allowed to cancel it if recieves an error from the lexer
 type parser struct {
-	in   <-chan token
-	init parseFunc
-	ast  *Node
-	prev token
+	in     <-chan token
+	quitIn func()
+	init   parseFunc
+	ast    *Node
+	prev   token
 }
 
 type parseFunc func(p *parser) (parseFunc, error)
 
 // Parse reads tokens from a channel and generates a ast.
 // The returned node is the root node of the ast.
-func parse(ch <-chan token) (*Node, error) {
+func parse(ch <-chan token, quit func()) (*Node, error) {
 	p := &parser{
-		in:   ch,
-		init: expektValue,
-		ast:  new(Node),
+		in:     ch,
+		quitIn: quit,
+		init:   expektValue,
+		ast:    new(Node),
 	}
 	var err error
 	for f := p.init; f != nil && err == nil; f, err = f(p) {
@@ -32,12 +34,14 @@ func parse(ch <-chan token) (*Node, error) {
 func expektKey(p *parser) (parseFunc, error) {
 	t := <-p.in
 	if t.Type != stringToken {
+		p.quitIn()
 		return nil, newParseError("key", p.prev, t, p.ast)
 	}
 	p.ast.key = t.Value
 	p.prev, t = t, <-p.in
 	defer func() { p.prev = t }()
 	if t.Type != colonToken {
+		p.quitIn()
 		return nil, newParseError("colon", p.prev, t, p.ast)
 	}
 	return expektValue, nil
@@ -51,6 +55,7 @@ func expektValue(p *parser) (parseFunc, error) {
 		p.ast.jsonType = Number
 		// number check
 		if _, err := strconv.ParseFloat(t.Value, 64); err != nil {
+			p.quitIn()
 			return nil, newParseError("number", p.prev, t, p.ast)
 		}
 		p.ast.value = t.Value
@@ -83,6 +88,7 @@ func expektValue(p *parser) (parseFunc, error) {
 		p.ast = &p.ast.Children[0]
 		return expektKey, nil
 	default:
+		p.quitIn()
 		return nil, newParseError("value", p.prev, t, p.ast)
 	}
 }
@@ -96,6 +102,7 @@ func expektDelim(p *parser) (parseFunc, error) {
 	switch t.Type {
 	case commaToken:
 		if p.ast.parent == nil {
+			p.quitIn()
 			return nil, newParseError("no comma", p.prev, t, p.ast)
 		}
 		if p.ast.parent.jsonType == Array {
@@ -108,6 +115,7 @@ func expektDelim(p *parser) (parseFunc, error) {
 			p.ast = &p.ast.parent.Children[len(p.ast.parent.Children)-1]
 			return expektKey, nil
 		}
+		p.quitIn()
 		return nil, newParseError("no comma", p.prev, t, p.ast)
 	case arrayCToken, objectCToken:
 		if p.ast.parent != nil {
@@ -115,6 +123,7 @@ func expektDelim(p *parser) (parseFunc, error) {
 		}
 		return expektDelim, nil
 	default:
+		p.quitIn()
 		return nil, newParseError("delimiter", p.prev, t, p.ast)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestLexer(t *testing.T) {
@@ -76,15 +77,17 @@ func TestLexer(t *testing.T) {
 		}},
 	}
 	for _, test := range tests {
-		lexc := lex(test.have)
+		lexc, q := lex(test.have)
 		first := true
 		for _, w := range test.want {
 			tk := <-lexc
 			if tk.Type != w.Type || tk.Value != w.Value {
 				t.Errorf("have %v, got %s, want %s", test.have, tk.String(), w)
+				q()
 			}
 			if !first && tk.Position == [2]int{} {
 				t.Errorf("token %s is missing position", tk.String())
+				q()
 			}
 			first = false
 		}
@@ -118,7 +121,8 @@ func TestLexeErr(t *testing.T) {
 	}
 	for _, test := range tests {
 		var have token
-		for tk := range lex(test.have) {
+		lexc, _ := lex(test.have)
+		for tk := range lexc {
 			have = tk
 		}
 		if have != test.want {
@@ -175,8 +179,8 @@ func TestParser(t *testing.T) {
 		}},
 	}
 	for _, test := range tests {
-		lexc := lex(test.have)
-		if ast, err := parse(lexc); err != nil || !eqNode(ast, &test.want) {
+		lexc, q := lex(test.have)
+		if ast, err := parse(lexc, q); err != nil || !eqNode(ast, &test.want) {
 			t.Errorf("for %v, got %v, with err: %v", test.have, ast, err)
 		}
 	}
@@ -333,5 +337,22 @@ func TestASTStringer(t *testing.T) {
 		if got != test.want {
 			t.Errorf("want: %s, got: %s", test.want, got)
 		}
+	}
+}
+
+func TestLexQuit(t *testing.T) {
+	lexc, q := lex(`["Hello, World!", 0, true]`)
+	if cap(lexc) != 1 {
+		t.Fatal("lex-channel must have capacity of 1")
+	}
+	time.Sleep(time.Millisecond) // fill channel
+	q()                          // quit lexer
+	time.Sleep(time.Millisecond) // wait for quit
+	if len(lexc) != 1 {
+		t.Fatal("lex-channel must have length of 1")
+	}
+	<-lexc // empty channel (length 1)
+	if _, ok := <-lexc; ok {
+		t.Error("lexer not stopped after recieving quit")
 	}
 }

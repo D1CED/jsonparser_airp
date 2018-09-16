@@ -48,7 +48,7 @@ func newToken(b byte, r, c int) token {
 func (t token) String() string {
 	switch t.Type {
 	case errToken:
-		return "lex-err_" + string(t.Value)
+		return "lex-err_" + t.Value
 	case nullToken:
 		return "'null'"
 	case trueToken:
