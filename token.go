@@ -40,39 +40,39 @@ func newToken(b byte, r, c int) token {
 	case ',':
 		return token{Type: commaToken, Position: [2]int{r, c}}
 	default:
-		return token{Value: string(b), Position: [2]int{r, c}}
+		panic("only single byte tokens allowed")
 	}
 }
 
 // String generates a readable form of a token meant for debuging.
 func (t token) String() string {
 	switch t.Type {
-	case errToken:
-		return "lex-err_" + t.Value
 	case nullToken:
-		return "'null'"
+		return "<null>"
 	case trueToken:
-		return "'true'"
+		return "<true>"
 	case falseToken:
-		return "'false'"
+		return "<false>"
 	case numberToken:
-		return t.Value
+		return "<num " + t.Value + ">"
 	case stringToken:
-		return `"` + t.Value + `"`
+		return `<str "` + t.Value + `">`
 	case commaToken:
-		return "','"
+		return "<,>"
 	case colonToken:
-		return "':'"
+		return "<:>"
 	case arrayOToken:
-		return "'['"
+		return "<[>"
 	case arrayCToken:
-		return "']'"
+		return "<]>"
 	case objectOToken:
-		return "'{'"
+		return "<{>"
 	case objectCToken:
-		return "'}'"
+		return "<}>"
+	case errToken:
+		return "<err " + t.Value + ">"
 	default:
-		return "lex-unkown"
+		return "<unkown " + t.Value + ">"
 	}
 }
 

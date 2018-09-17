@@ -28,6 +28,10 @@ func (e *ParseError) Error() string {
 	if e.before == (token{}) {
 		return fmt.Sprintf("%s; expected %s", e.Token.Error(), e.msg)
 	}
+	if e.ParentType == Error {
+		return fmt.Sprintf("%s; expected %s token after %s",
+			e.Token.Error(), e.msg, e.before.String())
+	}
 	return fmt.Sprintf("%s; expected %s token after %s (at %s in %s)",
 		e.Token.Error(), e.msg, e.before.String(), e.Key, e.ParentType)
 }
@@ -47,7 +51,7 @@ func currentKey(n *Node) string {
 		if o.key != "" {
 			ss = append(ss, o.key)
 		} else if o.jsonType == Array {
-			ss = append(ss, fmt.Sprint(len(o.Children)-1))
+			ss = append(ss, fmt.Sprint(len(o.value.([]Node))-1))
 		}
 	}
 	rr := make([]string, len(ss))

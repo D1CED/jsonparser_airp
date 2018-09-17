@@ -138,50 +138,49 @@ func TestParser(t *testing.T) {
 	}{
 		{`{"a": null}`, Node{
 			jsonType: Object,
-			Children: []Node{
+			value: []Node{
 				{key: "a", jsonType: Null},
 			},
 		}},
 		{`[false, -31.2, 5, "ab\"cd"]`, Node{
 			jsonType: Array,
-			Children: []Node{
-				{jsonType: Bool, value: "false"},
-				{jsonType: Number, value: "-31.2"},
-				{jsonType: Number, value: "5"},
+			value: []Node{
+				{jsonType: Bool, value: false},
+				{jsonType: Number, value: -31.2},
+				{jsonType: Number, value: 5.},
 				{jsonType: String, value: "ab\\\"cd"},
 			},
 		}},
 		{`{"a": 20, "b": [true, null]}`, Node{
 			jsonType: Object,
-			Children: []Node{
-				{key: "a", jsonType: Number, value: "20"},
-				{key: "b", jsonType: Array, Children: []Node{
-					{jsonType: Bool, value: "true"},
+			value: []Node{
+				{key: "a", jsonType: Number, value: 20.},
+				{key: "b", jsonType: Array, value: []Node{
+					{jsonType: Bool, value: true},
 					{jsonType: Null},
 				}},
 			},
 		}},
 		{`[0]`, Node{
 			jsonType: Array,
-			Children: []Node{
-				{jsonType: Number, value: "0"},
+			value: []Node{
+				{jsonType: Number, value: 0.},
 			},
 		}},
 		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, Node{
 			jsonType: Object,
-			Children: []Node{
-				{key: "a", jsonType: Object},
-				{key: "b", jsonType: Array},
+			value: []Node{
+				{key: "a", jsonType: Object, value: []Node(nil)},
+				{key: "b", jsonType: Array, value: []Node(nil)},
 				{key: "c", jsonType: Null},
-				{key: "d", jsonType: Number, value: "0"},
-				{key: "e", jsonType: String},
+				{key: "d", jsonType: Number, value: 0.},
+				{key: "e", jsonType: String, value: ""},
 			},
 		}},
 	}
-	for _, test := range tests {
-		lexc, q := lex(test.have)
-		if ast, err := parse(lexc, q); err != nil || !eqNode(ast, &test.want) {
-			t.Errorf("for %v, got %v, with err: %v", test.have, ast, err)
+	for i, test := range tests {
+		if ast, err := parse(lex(test.have)); err != nil || !eqNode(ast, &test.want) {
+			t.Errorf("for %v, got %v, with err: %v; %d", &test.want, ast, err, i)
 		}
 	}
 }
@@ -207,8 +206,8 @@ func TestParseErr(t *testing.T) {
 		}},
 		{`{"a":[],"b":{"a". false}}`, ParseError{
 			msg:        "colon",
-			Token:      token{Value: ".", Position: [2]int{0, 17}},
-			before:     token{Type: stringToken, Value: "a", Position: [2]int{0, 14}},
+			Token:      token{Value: ".", Position: [2]int{0, 16}},
+			before:     token{Type: stringToken, Value: "a", Position: [2]int{0, 13}},
 			ParentType: Object,
 			Key:        "b.a",
 		}},
@@ -234,45 +233,46 @@ func TestParseErr(t *testing.T) {
 	}
 	for _, test := range tests {
 		_, err := parse(lex(test.have))
-		if *(err.(*ParseError)) != test.want {
-			t.Errorf("got %v, want %v, for %v", (err.(*ParseError)), test.want, test.have)
+		pErr, ok := err.(*ParseError)
+		if !ok {
+			t.Fatal("error is not of type parse error in test")
+		}
+		if *pErr != test.want {
+			t.Errorf("got %v, want %v, for %v", pErr, test.want, test.have)
 		}
 	}
 }
 
 func TestFile(t *testing.T) {
-	want := &Node{key: "", jsonType: 6, value: "", Children: []Node{
-		{key: "bool", jsonType: 2, value: "true"},
-		{key: "obj", jsonType: 6, value: "", Children: []Node{
-			{key: "v", jsonType: 1, value: ""}}},
-		{key: "values", jsonType: 5, value: "", Children: []Node{
-			{key: "", jsonType: 6, value: "", Children: []Node{
-				{key: "a", jsonType: 3, value: "5"},
+	want := &Node{jsonType: 6, value: []Node{
+		{key: "bool", jsonType: 2, value: true},
+		{key: "obj", jsonType: 6, value: []Node{
+			{key: "v", jsonType: 1, value: nil}}},
+		{key: "values", jsonType: 5, value: []Node{
+			{key: "", jsonType: 6, value: []Node{
+				{key: "a", jsonType: 3, value: 5.},
 				{key: "b", jsonType: 4, value: "hi"},
-				{key: "c", jsonType: 3, value: "5.8"},
-				{key: "d", jsonType: 1, value: ""},
-				{key: "e", jsonType: 2, value: "true"}}},
-			{key: "", jsonType: 6, value: "", Children: []Node{
-				{key: "a", jsonType: 5, value: "", Children: []Node{
-					{key: "", jsonType: 3, value: "5"},
-					{key: "", jsonType: 3, value: "6"},
-					{key: "", jsonType: 3, value: "7"},
-					{key: "", jsonType: 3, value: "8"}}},
+				{key: "c", jsonType: 3, value: 5.8},
+				{key: "d", jsonType: 1, value: nil},
+				{key: "e", jsonType: 2, value: true}}},
+			{key: "", jsonType: 6, value: []Node{
+				{key: "a", jsonType: 5, value: []Node{
+					{key: "", jsonType: 3, value: 5.},
+					{key: "", jsonType: 3, value: 6.},
+					{key: "", jsonType: 3, value: 7.},
+					{key: "", jsonType: 3, value: 8.}}},
 				{key: "b", jsonType: 4, value: "hi2"},
-				{key: "c", jsonType: 3, value: "5.9"},
-				{key: "d", jsonType: 6, value: "", Children: []Node{
+				{key: "c", jsonType: 3, value: 5.9},
+				{key: "d", jsonType: 6, value: []Node{
 					{key: "f", jsonType: 4, value: "Hello there!"}}},
-				{key: "e", jsonType: 2, value: "false"}}}}}}}
+				{key: "e", jsonType: 2, value: false}}}}}}}
 	data, err := ioutil.ReadFile("testfiles/test.json")
 	if err != nil {
 		t.Fatalf("failed reading golden file 'testfiles/test.json': %v", err)
 	}
 	n, err := parse(lex(string(data)))
-	if err != nil {
-		t.Error(err)
-	}
-	if !eqNode(want, n) {
-		t.Error("WRONG!")
+	if err != nil || !eqNode(want, n) {
+		t.Errorf("test failed with error: %v", err)
 	}
 }
 
@@ -283,10 +283,10 @@ func TestValue(t *testing.T) {
 	}{
 		{`{"a": null}`, map[string]interface{}{"a": nil}},
 		{`[false, -31.2, 5, "ab\"cd"]`, []interface{}{
-			false, -31.2, float64(5), "ab\\\"cd",
+			false, -31.2, 5., "ab\\\"cd",
 		}},
 		{`{"a": 20, "b": [true, null]}`, map[string]interface{}{
-			"a": float64(20), "b": []interface{}{true, nil},
+			"a": 20., "b": []interface{}{true, nil},
 		}},
 	}
 	for _, test := range tests {
@@ -308,25 +308,25 @@ func TestASTStringer(t *testing.T) {
 	}{
 		{`{"a":null}`, Node{
 			jsonType: Object,
-			Children: []Node{
+			value: []Node{
 				{key: "a", jsonType: Null},
 			},
 		}},
 		{`[false,-31.2,5,"ab\"cd"]`, Node{
 			jsonType: Array,
-			Children: []Node{
-				{jsonType: Bool, value: "false"},
-				{jsonType: Number, value: "-31.2"},
-				{jsonType: Number, value: "5"},
+			value: []Node{
+				{jsonType: Bool, value: false},
+				{jsonType: Number, value: -31.2},
+				{jsonType: Number, value: float64(5)},
 				{jsonType: String, value: "ab\\\"cd"},
 			},
 		}},
 		{`{"a":20,"b":[true,null]}`, Node{
 			jsonType: Object,
-			Children: []Node{
-				{key: "a", jsonType: Number, value: "20"},
-				{key: "b", jsonType: Array, Children: []Node{
-					{jsonType: Bool, value: "true"},
+			value: []Node{
+				{key: "a", jsonType: Number, value: float64(20)},
+				{key: "b", jsonType: Array, value: []Node{
+					{jsonType: Bool, value: true},
 					{jsonType: Null},
 				}},
 			},

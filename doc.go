@@ -12,6 +12,5 @@ Node fulfills the json.Marshaler/Unmarshaler interface.
 
 TODO(JMH): change source from string to io.Reader
 TODO(JMH): merge with dev_home and fix
-TODO(JMH): change node.value to interface{}
 */
 package jsonparser_airp // import "github.com/d1ced/jsonparser-airp"

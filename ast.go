@@ -2,7 +2,6 @@ package jsonparser_airp
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -21,13 +20,18 @@ const (
 )
 
 // Node is one node of tree building a JSON-ast.
+// Depending on its internal type it holds different values:
+//     JSONType	ValueType
+//     Error	nil
+//     Bool	bool
+//     Number	float64
+//     String	string
+//     Array	[]Node
+//     Object	[]Node
 type Node struct {
 	key      string
 	jsonType JSONType
-	value    string
-	// Childen holds child Nodes if the type of the Node is either Object or
-	// Array. This allows you to modify an ast.
-	Children []Node
+	value    interface{}
 	parent   *Node
 }
 
@@ -54,28 +58,16 @@ func (n *Node) Type() JSONType {
 //     Bool      bool
 //     Null      nil (with the error being nil too)
 func (n *Node) Value() (interface{}, error) {
+	if !assertNodeType(n) {
+		return nil, fmt.Errorf("internal type mismatch; want %s, got %T",
+			n.jsonType, n.value)
+	}
 	switch n.jsonType {
-	case String:
+	default:
 		return n.value, nil
-	case Null:
-		return nil, nil
-	case Bool:
-		if n.value == "true" {
-			return true, nil
-		}
-		if n.value == "false" {
-			return false, nil
-		}
-		return nil, fmt.Errorf("bool-value is not boolen?! '%s'", n.value)
-	case Number:
-		f, err := strconv.ParseFloat(n.value, 64)
-		if err != nil {
-			return 0, fmt.Errorf("js to Go number '%v' conversion failed: %v", n.value, err)
-		}
-		return f, nil
 	case Object:
 		m := make(map[string]interface{}, 2)
-		for _, f := range n.Children {
+		for _, f := range n.value.([]Node) {
 			itf, err := f.Value()
 			if err != nil {
 				return nil, err
@@ -85,7 +77,7 @@ func (n *Node) Value() (interface{}, error) {
 		return m, nil
 	case Array:
 		s := make([]interface{}, 0, 2)
-		for _, f := range n.Children {
+		for _, f := range n.value.([]Node) {
 			itf, err := f.Value()
 			if err != nil {
 				return nil, err
@@ -93,8 +85,6 @@ func (n *Node) Value() (interface{}, error) {
 			s = append(s, itf)
 		}
 		return s, nil
-	default:
-		return nil, fmt.Errorf("jsonToGo: %v", Error)
 	}
 }
 
@@ -102,22 +92,31 @@ func (n *Node) format(prefix, postfix, commaSep, colonSep string, level int) (st
 	if n == nil {
 		return "", nil
 	}
+	if !assertNodeType(n) {
+		return "", fmt.Errorf("format; assertion failure")
+	}
 	switch n.jsonType {
 	case Null:
 		return "null", nil
-	case Bool, Number:
-		return n.value, nil
+	case Bool:
+		if n.value.(bool) {
+			return "true", nil
+		}
+		return "false", nil
+	case Number:
+		return fmt.Sprint(n.value.(float64)), nil
 	case String:
-		return `"` + n.value + `"`, nil
+		return `"` + n.value.(string) + `"`, nil
 	case Array:
-		if len(n.Children) == 0 {
+		cc := n.value.([]Node)
+		if len(cc) == 0 {
 			return strings.Repeat(prefix, level) + "[]", nil
 		}
 		builder := strings.Builder{}
 		builder.Grow(64)
 		builder.WriteString(strings.Repeat(prefix, level) +
 			"[" + postfix)
-		for _, c := range n.Children[:len(n.Children)-1] {
+		for _, c := range cc[:len(cc)-1] {
 			s, err := c.format(prefix, postfix, commaSep,
 				colonSep, level+1)
 			if err != nil {
@@ -127,7 +126,7 @@ func (n *Node) format(prefix, postfix, commaSep, colonSep string, level int) (st
 				s + "," + commaSep + postfix,
 			)
 		}
-		s, err := n.Children[len(n.Children)-1].format(prefix,
+		s, err := cc[len(cc)-1].format(prefix,
 			postfix, commaSep, colonSep, level+1)
 		if err != nil {
 			return "", err
@@ -137,14 +136,15 @@ func (n *Node) format(prefix, postfix, commaSep, colonSep string, level int) (st
 		)
 		return builder.String(), nil
 	case Object:
-		if len(n.Children) == 0 {
+		cc := n.value.([]Node)
+		if len(cc) == 0 {
 			return strings.Repeat(prefix, level) + "{}", nil
 		}
 		builder := strings.Builder{}
 		builder.Grow(64)
 		builder.WriteString(strings.Repeat(prefix, level) + "{" +
 			postfix)
-		for _, c := range n.Children[:len(n.Children)-1] {
+		for _, c := range cc[:len(cc)-1] {
 			s, err := c.format(prefix, postfix, commaSep,
 				colonSep, level+1)
 			if err != nil {
@@ -155,19 +155,22 @@ func (n *Node) format(prefix, postfix, commaSep, colonSep string, level int) (st
 				s + "," + commaSep + postfix,
 			)
 		}
-		s, err := n.Children[len(n.Children)-1].format(prefix,
+		s, err := cc[len(cc)-1].format(prefix,
 			postfix, commaSep, colonSep, level+1)
 		if err != nil {
 			return "", err
 		}
 		builder.WriteString(strings.Repeat(prefix, level+1) +
-			"\"" + n.Children[len(n.Children)-1].key + "\":" +
+			"\"" + cc[len(cc)-1].key + "\":" +
 			colonSep +
 			s + postfix + strings.Repeat(prefix, level) + "}",
 		)
 		return builder.String(), nil
+	case Error:
+		return "<error>", nil
 	default:
-		return "", fmt.Errorf("node of unkown type: &airp.Node{key: %v jsonType: %v value: %v} ", n.key, n.jsonType, n.value)
+		return "", fmt.Errorf("node of unkown type: &airp.Node{key: %v jsonType: %v value: %v} ",
+			n.key, n.jsonType, n.value)
 	}
 }
 
@@ -206,26 +209,60 @@ func (n *Node) UnmarshalJSON(data []byte) error {
 }
 
 func eqNode(a, b *Node) bool {
-	defer func() { recover() }()
-	if a.key == b.key && a.jsonType == b.jsonType && a.value == b.value {
-		if a.Children != nil || b.Children != nil {
-			for i := range a.Children {
-				if !eqNode(&a.Children[i], &b.Children[i]) {
-					return false
-				}
+	if a == b {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	if !assertNodeType(a) || !assertNodeType(b) {
+		fmt.Printf("assertion failure, %v %T\n", a.jsonType, a.value)
+		return false
+	}
+	an, aok := a.value.([]Node)
+	bn, bok := b.value.([]Node)
+	if aok && bok && len(an) == len(bn) {
+		for i := range an {
+			if !eqNode(&an[i], &bn[i]) {
+				return false
 			}
 		}
+		return true
+	}
+	if a.key == b.key && a.jsonType == b.jsonType && a.value == b.value {
 		return true
 	}
 	return false
 }
 
-// StandaloneNode creates a new Node from given arguments meant for
-// modification of an existing ast.
-func StandaloneNode(k, v string, t JSONType) *Node {
-	return &Node{
-		key:      k,
-		jsonType: t,
-		value:    v,
+func assertNodeType(n *Node) bool {
+	switch n.value.(type) {
+	case nil:
+		return n.jsonType == Null || n.jsonType == Error
+	case bool:
+		return n.jsonType == Bool
+	case float64:
+		return n.jsonType == Number
+	case string:
+		return n.jsonType == String
+	case []Node:
+		return n.jsonType == Array || n.jsonType == Object
+	default:
+		return false
 	}
+}
+
+func StandaloneNode(str string) *Node {
+	n, err := parse(lex(str))
+	if err != nil {
+		panic(err)
+	}
+	if cc, ok := n.value.([]Node); ok && len(cc) > 0 {
+		panic("given value must be single!")
+	}
+	return n
+}
+
+func (n *Node) AddChildren(nn ...Node) {
+	n.value = append(n.value.([]Node), nn...)
 }

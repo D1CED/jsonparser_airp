@@ -25,8 +25,7 @@ func lexSend(l *lexer, f lexFunc, t token) lexFunc {
 
 // lex reads in a json string and generate tokens for the parser.
 func lex(data string) (stream <-chan token, quit func()) {
-	ch := make(chan token, 1)
-	q := make(chan struct{})
+	ch, q := make(chan token, 1), make(chan struct{})
 	l := &lexer{
 		mode: noneMode,
 		data: data,
@@ -51,14 +50,17 @@ func noneMode(l *lexer) lexFunc {
 		return nil
 	}
 	switch l.data[l.pos] {
-	case ' ', '\t', '\r':
-		fwd()
-		return noneMode
 	case '\n':
-		l.pos++
-		l.start = l.pos
-		l.col = 0
+		fwd()
 		l.row++
+		l.col = 0
+		return noneMode
+	case '\r':
+		fwd()
+		l.col = 0
+		return noneMode
+	case ' ', '\t':
+		fwd()
 		return noneMode
 	case '{', '}', '[', ']', ',', ':':
 		m := lexSend(l, noneMode, newToken(l.data[l.pos], l.row, l.col))

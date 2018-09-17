@@ -54,11 +54,12 @@ func expektValue(p *parser) (parseFunc, error) {
 	case numberToken:
 		p.ast.jsonType = Number
 		// number check
-		if _, err := strconv.ParseFloat(t.Value, 64); err != nil {
+		num, err := strconv.ParseFloat(t.Value, 64)
+		if err != nil {
 			p.quitIn()
 			return nil, newParseError("number", p.prev, t, p.ast)
 		}
-		p.ast.value = t.Value
+		p.ast.value = num
 		return expektDelim, nil
 	case stringToken:
 		p.ast.jsonType = String
@@ -69,23 +70,25 @@ func expektValue(p *parser) (parseFunc, error) {
 		return expektDelim, nil
 	case trueToken:
 		p.ast.jsonType = Bool
-		p.ast.value = "true"
+		p.ast.value = true
 		return expektDelim, nil
 	case falseToken:
 		p.ast.jsonType = Bool
-		p.ast.value = "false"
+		p.ast.value = false
 		return expektDelim, nil
 	case arrayOToken:
 		p.ast.jsonType = Array
-		p.ast.Children = make([]Node, 1)
-		p.ast.Children[0].parent = p.ast
-		p.ast = &p.ast.Children[0]
+		nn := make([]Node, 1)
+		nn[0].parent = p.ast
+		p.ast.value = nn
+		p.ast = &nn[0]
 		return expektValue, nil
 	case objectOToken:
 		p.ast.jsonType = Object
-		p.ast.Children = make([]Node, 1)
-		p.ast.Children[0].parent = p.ast
-		p.ast = &p.ast.Children[0]
+		nn := make([]Node, 1)
+		nn[0].parent = p.ast
+		p.ast.value = nn
+		p.ast = &nn[0]
 		return expektKey, nil
 	default:
 		p.quitIn()
@@ -106,21 +109,23 @@ func expektDelim(p *parser) (parseFunc, error) {
 			return nil, newParseError("no comma", p.prev, t, p.ast)
 		}
 		if p.ast.parent.jsonType == Array {
-			p.ast.parent.Children = append(p.ast.parent.Children, Node{parent: p.ast.parent})
-			p.ast = &p.ast.parent.Children[len(p.ast.parent.Children)-1]
+			p.ast.parent.value = append(p.ast.parent.value.([]Node), Node{parent: p.ast.parent})
+			p.ast = &p.ast.parent.value.([]Node)[len(p.ast.parent.value.([]Node))-1]
 			return expektValue, nil
 		}
 		if p.ast.parent.jsonType == Object {
-			p.ast.parent.Children = append(p.ast.parent.Children, Node{parent: p.ast.parent})
-			p.ast = &p.ast.parent.Children[len(p.ast.parent.Children)-1]
+			p.ast.parent.value = append(p.ast.parent.value.([]Node), Node{parent: p.ast.parent})
+			p.ast = &p.ast.parent.value.([]Node)[len(p.ast.parent.value.([]Node))-1]
 			return expektKey, nil
 		}
 		p.quitIn()
 		return nil, newParseError("no comma", p.prev, t, p.ast)
 	case arrayCToken, objectCToken:
-		if p.ast.parent != nil {
-			p.ast = p.ast.parent
+		if p.ast.parent == nil {
+			p.quitIn()
+			return nil, newParseError("to be in array or object", p.prev, t, p.ast)
 		}
+		p.ast = p.ast.parent
 		return expektDelim, nil
 	default:
 		p.quitIn()
