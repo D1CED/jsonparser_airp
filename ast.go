@@ -3,6 +3,7 @@ package jsonparser_airp
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -92,14 +93,14 @@ func (n *Node) Value() (interface{}, error) {
 	}
 }
 
-func (n *Node) format(prefix, postfix, commaSep, colonSep string) (string, error) {
+func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (int, error) {
 	if n == nil {
-		return "", nil
+		return 0, fmt.Errorf("<nil>")
 	}
 	var inner func(int) error
 	var m, o = *n, Node{}
 	buf := make([]byte, 0, 64)
-	inner = func(level int) error {
+	inner = func(level int) error { // closure with single buffer
 		if !assertNodeType(&m) {
 			return fmt.Errorf("format; assertion failure")
 		}
@@ -183,33 +184,36 @@ func (n *Node) format(prefix, postfix, commaSep, colonSep string) (string, error
 	}
 	err := inner(0)
 	if err != nil {
-		return "", err
+		return 0, err
 	}
-	return string(buf), nil
+	return w.Write(buf)
 }
 
 // String formats an ast as valid JSON with few whitspace.
 func (n *Node) String() string {
-	s, err := n.format("", "", "", "")
+	b := &strings.Builder{}
+	_, err := n.format(b, "", "", "", "")
 	if err != nil {
 		return ""
 	}
-	return s
+	return b.String()
 }
 
 // stringDebug formats an ast for inspecting the internals.
 func (n *Node) stringDebug() string {
-	s, _ := n.format("!", "~", "-", "^")
-	return s
+	b := &strings.Builder{}
+	n.format(b, "!", "~", "-", "^")
+	return b.String()
 }
 
 // MarshalJSON implements the json.Mashaler interface for Node
 func (n *Node) MarshalJSON() ([]byte, error) {
-	s, err := n.format("", "", " ", " ")
+	b := &bytes.Buffer{}
+	_, err := n.format(b, "", "", " ", " ")
 	if err != nil {
 		return nil, err
 	}
-	return []byte(s), nil
+	return b.Bytes(), nil
 }
 
 // UnmarshalJSON implements the json.Unmashaler interface for Node
@@ -296,4 +300,12 @@ func (n *Node) AddChildren(nn ...Node) {
 	} else {
 		panic("n is not array or object")
 	}
+}
+
+func NewJSON(r io.Reader) (*Node, error) {
+	return parse(lex(r))
+}
+
+func (n *Node) WriteJSON(w io.Writer) (int, error) {
+	return n.format(w, "", "", "", "")
 }

@@ -6,10 +6,11 @@ import (
 )
 
 type ParseError struct {
-	msg           string
-	Token, before token
-	ParentType    JSONType
-	Key           string
+	msg        string
+	token      token
+	before     token
+	parentType JSONType
+	key        string
 }
 
 func newParseError(msg string, before, after token, ast *Node) *ParseError {
@@ -18,26 +19,30 @@ func newParseError(msg string, before, after token, ast *Node) *ParseError {
 	return &ParseError{
 		msg:        msg,
 		before:     before,
-		Token:      after,
-		ParentType: parent,
-		Key:        key,
+		token:      after,
+		parentType: parent,
+		key:        key,
 	}
 }
 
 func (e *ParseError) Error() string {
 	if e.before == (token{}) {
-		return fmt.Sprintf("%s; expected %s", e.Token.Error(), e.msg)
+		return fmt.Sprintf("%s; expected %s", e.token.Error(), e.msg)
 	}
-	if e.ParentType == Error {
+	if e.parentType == Error {
 		return fmt.Sprintf("%s; expected %s token after %s",
-			e.Token.Error(), e.msg, e.before.String())
+			e.token.Error(), e.msg, e.before.String())
 	}
-	if e.Key == "" {
+	if e.key == "" {
 		return fmt.Sprintf("%s; expected %s token after %s (in top-level %s)",
-			e.Token.Error(), e.msg, e.before.String(), e.ParentType)
+			e.token.Error(), e.msg, e.before.String(), e.parentType)
 	}
 	return fmt.Sprintf("%s; expected %s token after %s (at %s in %s)",
-		e.Token.Error(), e.msg, e.before.String(), e.Key, e.ParentType)
+		e.token.Error(), e.msg, e.before.String(), e.key, e.parentType)
+}
+
+func (e *ParseError) Where() (row, col int) {
+	return e.token.Position[0], e.token.Position[1]
 }
 
 // helper functions
