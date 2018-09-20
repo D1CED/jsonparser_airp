@@ -111,7 +111,10 @@ func expektDelim(p *parser) (parseFunc, error) {
 	t, ok := <-p.in
 	defer func() { p.prev = t }()
 	if !ok {
-		return nil, nil // all OK!
+		if p.ast.parent == nil {
+			return nil, nil // all OK!
+		}
+		return nil, newParseError("delimiter", p.prev, p.prev, p.ast)
 	}
 	switch t.Type {
 	case commaToken:

@@ -201,6 +201,13 @@ func TestParseErr(t *testing.T) {
 			ParentType: Object,
 			Key:        "a",
 		}},
+		{`{"a": null`, ParseError{
+			msg:        "delimiter",
+			Token:      token{Type: nullToken, Position: [2]int{0, 6}},
+			before:     token{Type: nullToken, Position: [2]int{0, 6}},
+			ParentType: Object,
+			Key:        "a",
+		}},
 		{`{"b": "\"}`, ParseError{
 			msg:        "value",
 			Token:      token{Value: `"\"}`, Position: [2]int{0, 6}},
@@ -242,7 +249,7 @@ func TestParseErr(t *testing.T) {
 			t.Fatal("error is not of type parse error in test")
 		}
 		if *pErr != test.want {
-			t.Errorf("got %#v, want %v, for %v", pErr, test.want, test.have)
+			t.Errorf("got %v, want %v, for %v", pErr, test.want, test.have)
 		}
 	}
 }

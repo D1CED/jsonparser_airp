@@ -71,17 +71,9 @@ func noneMode(l *lexer) lexFunc {
 	case '"':
 		l.col++
 		return stringMode
-	case '-', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		l.reader.UnreadRune()
 		return numberMode
-	case '0':
-		m := lexSend(l, noneMode, token{
-			Type:     numberToken,
-			Value:    "0",
-			Position: [2]int{l.row, l.col},
-		})
-		l.col++
-		return m
 	default:
 		l.reader.UnreadRune()
 		return otherMode
