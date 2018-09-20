@@ -1,6 +1,7 @@
 package jsonparser_airp
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 )
@@ -200,7 +201,7 @@ func (n *Node) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements the json.Unmashaler interface for Node
 func (n *Node) UnmarshalJSON(data []byte) error {
-	m, err := parse(lex(string(data)))
+	m, err := parse(lex(bytes.NewReader(data)))
 	if err != nil {
 		return err
 	}
@@ -252,14 +253,15 @@ func assertNodeType(n *Node) bool {
 	}
 }
 
-func StandaloneNode(str string) *Node {
-	n, err := parse(lex(str))
+func StandaloneNode(key, str string) *Node {
+	n, err := parse(lex(strings.NewReader(str)))
 	if err != nil {
 		panic(err)
 	}
 	if cc, ok := n.value.([]Node); ok && len(cc) > 0 {
 		panic("given value must be single!")
 	}
+	n.key = key
 	return n
 }
 

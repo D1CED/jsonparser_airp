@@ -25,7 +25,7 @@ type token struct {
 	Position [2]int
 }
 
-func newToken(b byte, r, c int) token {
+func newToken(b rune, r, c int) token {
 	switch b {
 	case '{':
 		return token{Type: objectOToken, Position: [2]int{r, c}}

@@ -1,13 +1,14 @@
 package jsonparser_airp
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 )
 
 // Valid reports whether data is a valid JSON encoding.
 func Valid(data []byte) bool {
-	_, err := parse(lex(string(data)))
+	_, err := parse(lex(bytes.NewReader(data)))
 	return err == nil
 }
 
@@ -27,7 +28,7 @@ func Unmarshal(data []byte, v interface{}) (err error) {
 		return fmt.Errorf("v %v not addressable", v)
 	}
 	if s, ok := v.(*interface{}); ok {
-		n, err := parse(lex(string(data)))
+		n, err := parse(lex(bytes.NewReader(data)))
 		if err != nil {
 			return err
 		}
@@ -39,7 +40,7 @@ func Unmarshal(data []byte, v interface{}) (err error) {
 		return nil
 	}
 	// struct
-	n, err := parse(lex(string(data)))
+	n, err := parse(lex(bytes.NewReader(data)))
 	if err != nil {
 		return err
 	}

@@ -1,8 +1,10 @@
 package jsonparser_airp
 
 import (
+	"bytes"
 	"io/ioutil"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -77,22 +79,24 @@ func TestLexer(t *testing.T) {
 		}},
 	}
 	for _, test := range tests {
-		lexc, q := lex(test.have)
+		lexc, q := lex(strings.NewReader(test.have))
 		first := true
 		for _, w := range test.want {
 			tk := <-lexc
 			if tk.Type != w.Type || tk.Value != w.Value {
 				t.Errorf("have %v, got %s, want %s", test.have, tk.String(), w)
 				q()
+				return
 			}
 			if !first && tk.Position == [2]int{} {
 				t.Errorf("token %s is missing position", tk.String())
 				q()
+				return
 			}
 			first = false
 		}
 		if tk, ok := <-lexc; ok {
-			t.Errorf("expected nothing, got %s", tk)
+			t.Errorf("expected nothing, got %s", tk.String())
 		}
 	}
 }
@@ -121,7 +125,7 @@ func TestLexeErr(t *testing.T) {
 	}
 	for _, test := range tests {
 		var have token
-		lexc, _ := lex(test.have)
+		lexc, _ := lex(strings.NewReader(test.have))
 		for tk := range lexc {
 			have = tk
 		}
@@ -179,7 +183,7 @@ func TestParser(t *testing.T) {
 		}},
 	}
 	for i, test := range tests {
-		if ast, err := parse(lex(test.have)); err != nil || !eqNode(ast, &test.want) {
+		if ast, err := parse(lex(strings.NewReader(test.have))); err != nil || !eqNode(ast, &test.want) {
 			t.Errorf("for %v, got %v, with err: %v; %d", &test.want, ast, err, i)
 		}
 	}
@@ -232,13 +236,13 @@ func TestParseErr(t *testing.T) {
 		}},
 	}
 	for _, test := range tests {
-		_, err := parse(lex(test.have))
+		_, err := parse(lex(strings.NewReader(test.have)))
 		pErr, ok := err.(*ParseError)
 		if !ok {
 			t.Fatal("error is not of type parse error in test")
 		}
 		if *pErr != test.want {
-			t.Errorf("got %v, want %v, for %v", pErr, test.want, test.have)
+			t.Errorf("got %#v, want %v, for %v", pErr, test.want, test.have)
 		}
 	}
 }
@@ -270,7 +274,7 @@ func TestFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed reading golden file 'testfiles/test.json': %v", err)
 	}
-	n, err := parse(lex(string(data)))
+	n, err := parse(lex(bytes.NewReader(data)))
 	if err != nil || !eqNode(want, n) {
 		t.Errorf("test failed with error: %v", err)
 	}
@@ -290,7 +294,7 @@ func TestValue(t *testing.T) {
 		}},
 	}
 	for _, test := range tests {
-		ast, _ := parse(lex(test.have))
+		ast, _ := parse(lex(strings.NewReader(test.have)))
 		itf, err := ast.Value()
 		if err != nil {
 			t.Error(err)
@@ -341,7 +345,7 @@ func TestASTStringer(t *testing.T) {
 }
 
 func TestLexQuit(t *testing.T) {
-	lexc, q := lex(`["Hello, World!", 0, true]`)
+	lexc, q := lex(strings.NewReader(`["Hello, World!", 0, true]`))
 	if cap(lexc) != 1 {
 		t.Fatal("lex-channel must have capacity of 1")
 	}
