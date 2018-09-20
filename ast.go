@@ -38,6 +38,9 @@ type Node struct {
 
 // Key returns the name of a Node.
 func (n *Node) Key() string {
+	if n == nil {
+		return ""
+	}
 	return n.key
 }
 
@@ -89,95 +92,105 @@ func (n *Node) Value() (interface{}, error) {
 	}
 }
 
-func (n *Node) format(prefix, postfix, commaSep, colonSep string, level int) (string, error) {
+func (n *Node) format(prefix, postfix, commaSep, colonSep string) (string, error) {
 	if n == nil {
 		return "", nil
 	}
-	if !assertNodeType(n) {
-		return "", fmt.Errorf("format; assertion failure")
-	}
-	switch n.jsonType {
-	case Null:
-		return "null", nil
-	case Bool:
-		if n.value.(bool) {
-			return "true", nil
+	var inner func(int) error
+	var m, o = *n, Node{}
+	buf := make([]byte, 0, 64)
+	inner = func(level int) error {
+		if !assertNodeType(&m) {
+			return fmt.Errorf("format; assertion failure")
 		}
-		return "false", nil
-	case Number:
-		return fmt.Sprint(n.value.(float64)), nil
-	case String:
-		return `"` + n.value.(string) + `"`, nil
-	case Array:
-		cc := n.value.([]Node)
-		if len(cc) == 0 {
-			return strings.Repeat(prefix, level) + "[]", nil
-		}
-		builder := strings.Builder{}
-		builder.Grow(64)
-		builder.WriteString(strings.Repeat(prefix, level) +
-			"[" + postfix)
-		for _, c := range cc[:len(cc)-1] {
-			s, err := c.format(prefix, postfix, commaSep,
-				colonSep, level+1)
-			if err != nil {
-				return "", err
+		switch m.jsonType {
+		case Null:
+			buf = append(buf, "null"...)
+			return nil
+		case Bool:
+			if m.value.(bool) {
+				buf = append(buf, "true"...)
+				return nil
 			}
-			builder.WriteString(strings.Repeat(prefix, level+1) +
-				s + "," + commaSep + postfix,
-			)
-		}
-		s, err := cc[len(cc)-1].format(prefix,
-			postfix, commaSep, colonSep, level+1)
-		if err != nil {
-			return "", err
-		}
-		builder.WriteString(strings.Repeat(prefix, level+1) +
-			s + postfix + strings.Repeat(prefix, level) + "]",
-		)
-		return builder.String(), nil
-	case Object:
-		cc := n.value.([]Node)
-		if len(cc) == 0 {
-			return strings.Repeat(prefix, level) + "{}", nil
-		}
-		builder := strings.Builder{}
-		builder.Grow(64)
-		builder.WriteString(strings.Repeat(prefix, level) + "{" +
-			postfix)
-		for _, c := range cc[:len(cc)-1] {
-			s, err := c.format(prefix, postfix, commaSep,
-				colonSep, level+1)
-			if err != nil {
-				return "", err
+			buf = append(buf, "false"...)
+			return nil
+		case Number:
+			buf = append(buf, fmt.Sprint(m.value.(float64))...)
+			return nil
+		case String:
+			buf = append(buf, (`"` + m.value.(string) + `"`)...)
+			return nil
+		case Array:
+			cc := m.value.([]Node)
+			if len(cc) == 0 {
+				buf = append(buf, (strings.Repeat(prefix, level) + "[]")...)
+				return nil
 			}
-			builder.WriteString(strings.Repeat(prefix, level+1) +
-				"\"" + c.key + "\":" + colonSep +
-				s + "," + commaSep + postfix,
-			)
+			buf = append(buf, ("[" + postfix)...)
+			for _, c := range cc[:len(cc)-1] {
+				buf = append(buf, strings.Repeat(prefix, level+1)...)
+				m, o = c, m
+				err := inner(level + 1)
+				if err != nil {
+					return err
+				}
+				m = o
+				buf = append(buf, ("," + commaSep + postfix)...)
+			}
+			buf = append(buf, strings.Repeat(prefix, level+1)...)
+			m, o = cc[len(cc)-1], m
+			err := inner(level + 1)
+			if err != nil {
+				return err
+			}
+			m = o
+			buf = append(buf, (postfix + strings.Repeat(prefix, level) + "]")...)
+			return nil
+		case Object:
+			cc := n.value.([]Node)
+			if len(cc) == 0 {
+				buf = append(buf, (strings.Repeat(prefix, level) + "{}")...)
+				return nil
+			}
+			buf = append(buf, ("{" + postfix)...)
+			for _, c := range cc[:len(cc)-1] {
+				buf = append(buf, (strings.Repeat(prefix, level+1) +
+					"\"" + c.key + "\":" + colonSep)...)
+				m, o = c, m
+				err := inner(level + 1)
+				if err != nil {
+					return err
+				}
+				buf = append(buf, ("," + commaSep + postfix)...)
+				m = o
+			}
+			buf = append(buf, (strings.Repeat(prefix, level+1) + "\"" +
+				cc[len(cc)-1].key + "\":" + colonSep)...)
+			m, o = cc[len(cc)-1], m
+			err := inner(level + 1)
+			if err != nil {
+				return err
+			}
+			m = o
+			buf = append(buf, (postfix + strings.Repeat(prefix, level) + "}")...)
+			return nil
+		case Error:
+			buf = append(buf, "<error>"...)
+			return nil
+		default:
+			return fmt.Errorf("node of unkown type: %#v", m)
 		}
-		s, err := cc[len(cc)-1].format(prefix,
-			postfix, commaSep, colonSep, level+1)
-		if err != nil {
-			return "", err
-		}
-		builder.WriteString(strings.Repeat(prefix, level+1) +
-			"\"" + cc[len(cc)-1].key + "\":" +
-			colonSep +
-			s + postfix + strings.Repeat(prefix, level) + "}",
-		)
-		return builder.String(), nil
-	case Error:
-		return "<error>", nil
-	default:
-		return "", fmt.Errorf("node of unkown type: &airp.Node{key: %v jsonType: %v value: %v} ",
-			n.key, n.jsonType, n.value)
 	}
+	err := inner(0)
+	if err != nil {
+		return "", err
+	}
+	return string(buf), nil
 }
 
 // String formats an ast as valid JSON with few whitspace.
 func (n *Node) String() string {
-	s, err := n.format("", "", "", "", 0)
+	s, err := n.format("", "", "", "")
 	if err != nil {
 		return ""
 	}
@@ -186,13 +199,13 @@ func (n *Node) String() string {
 
 // stringDebug formats an ast for inspecting the internals.
 func (n *Node) stringDebug() string {
-	s, _ := n.format("!", "~", "_", "^", 0)
+	s, _ := n.format("!", "~", "-", "^")
 	return s
 }
 
 // MarshalJSON implements the json.Mashaler interface for Node
 func (n *Node) MarshalJSON() ([]byte, error) {
-	s, err := n.format("", "", " ", " ", 0)
+	s, err := n.format("", "", " ", " ")
 	if err != nil {
 		return nil, err
 	}
@@ -253,6 +266,8 @@ func assertNodeType(n *Node) bool {
 	}
 }
 
+// StandaloneNode generates a single json value of str.
+// It panics if str is a compund json expression.
 func StandaloneNode(key, str string) *Node {
 	n, err := parse(lex(strings.NewReader(str)))
 	if err != nil {
@@ -265,6 +280,20 @@ func StandaloneNode(key, str string) *Node {
 	return n
 }
 
+// AddChildren appends nn nodes to the Array or Object n.
+// It panics if n is not of the two mentioned types or if appended values
+// in an object don't have keys.
 func (n *Node) AddChildren(nn ...Node) {
-	n.value = append(n.value.([]Node), nn...)
+	if n.jsonType == Object {
+		for _, n := range nn {
+			if n.key == "" {
+				panic("empty key for object value")
+			}
+		}
+		n.value = append(n.value.([]Node), nn...)
+	} else if n.jsonType == Array {
+		n.value = append(n.value.([]Node), nn...)
+	} else {
+		panic("n is not array or object")
+	}
 }

@@ -241,6 +241,17 @@ func TestParseErr(t *testing.T) {
 			ParentType: Object,
 			Key:        "0.b",
 		}},
+		{`[{"b":true},false,5.2,]`, ParseError{
+			msg:        "value",
+			Token:      token{Type: arrayCToken, Position: [2]int{0, 22}},
+			before:     token{Type: commaToken, Position: [2]int{0, 21}},
+			ParentType: Array,
+			Key:        "3",
+		}},
+		{`abcdefghij`, ParseError{
+			msg:   "value",
+			Token: token{Value: "abcdefghij", Position: [2]int{0, 0}},
+		}},
 	}
 	for _, test := range tests {
 		_, err := parse(lex(strings.NewReader(test.have)))
@@ -345,6 +356,45 @@ func TestASTStringer(t *testing.T) {
 	}
 	for _, test := range tests {
 		got := test.have.String()
+		if got != test.want {
+			t.Errorf("want: %s, got: %s", test.want, got)
+		}
+	}
+}
+
+func TestASTStringerDebug(t *testing.T) {
+	tests := []struct {
+		want string
+		have Node
+	}{
+		{`{~!"a":^null~}`, Node{
+			jsonType: Object,
+			value: []Node{
+				{key: "a", jsonType: Null},
+			},
+		}},
+		{`[~!false,-~!-31.2,-~!5,-~!"ab\"cd"~]`, Node{
+			jsonType: Array,
+			value: []Node{
+				{jsonType: Bool, value: false},
+				{jsonType: Number, value: -31.2},
+				{jsonType: Number, value: float64(5)},
+				{jsonType: String, value: "ab\\\"cd"},
+			},
+		}},
+		{`{~!"a":^20,-~!"b":^[~!!true,-~!!null~!]~}`, Node{
+			jsonType: Object,
+			value: []Node{
+				{key: "a", jsonType: Number, value: float64(20)},
+				{key: "b", jsonType: Array, value: []Node{
+					{jsonType: Bool, value: true},
+					{jsonType: Null},
+				}},
+			},
+		}},
+	}
+	for _, test := range tests {
+		got := test.have.stringDebug()
 		if got != test.want {
 			t.Errorf("want: %s, got: %s", test.want, got)
 		}
