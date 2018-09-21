@@ -183,7 +183,7 @@ func TestParser(t *testing.T) {
 		}},
 	}
 	for i, test := range tests {
-		if ast, err := parse(lex(strings.NewReader(test.have))); err != nil || !eqNode(ast, &test.want) {
+		if ast, err := parse(lex(strings.NewReader(test.have))); err != nil || !EqNode(ast, &test.want) {
 			t.Errorf("for %v, got %v, with err: %v; %d", &test.want, ast, err, i)
 		}
 	}
@@ -293,7 +293,7 @@ func TestFile(t *testing.T) {
 		t.Fatalf("failed reading golden file 'testfiles/test.json': %v", err)
 	}
 	n, err := parse(lex(bytes.NewReader(data)))
-	if err != nil || !eqNode(want, n) {
+	if err != nil || !EqNode(want, n) {
 		t.Errorf("test failed with error: %v", err)
 	}
 }
@@ -415,5 +415,48 @@ func TestLexQuit(t *testing.T) {
 	<-lexc // empty channel (length 1)
 	if _, ok := <-lexc; ok {
 		t.Error("lexer not stopped after recieving quit")
+	}
+}
+
+func TestNewJSONGo(t *testing.T) {
+	type myType int
+	var intPtr = new(int)
+	*intPtr = 50
+	tests := []struct {
+		have interface{}
+		want string
+	}{
+		{nil, "null"},
+		{true, "true"},
+		{5, "5"},
+		{myType(550022), "550022"},
+		{5., "5"},
+		{"Hello, World!", `"Hello, World!"`},
+		{[...]int{1, 2, 3, 4}, "[1,2,3,4]"},
+		{[]interface{}{nil, true, 3, "hi"}, `[null,true,3,"hi"]`},
+		{map[string]interface{}{"bb": false}, `{"bb":false}`},
+		{struct {
+			Integer int
+			a       string
+		}{20, "aa"}, `{"Integer":20}`},
+		{struct {
+			Integer int `json:"int"`
+			a       string
+		}{20, "aa"}, `{"int":20}`},
+		{&struct {
+			Integer *int `json:"intptr"`
+			a       string
+		}{intPtr, "aa"}, `{"intptr":50}`},
+		{&[...]uint64{6}, "[6]"},
+		{[]byte("bytes"), `"bytes"`},
+	}
+	for _, test := range tests {
+		n, err := NewJSONGo(test.have)
+		if err != nil {
+			t.Error(err)
+		}
+		if n.String() != test.want {
+			t.Errorf("got %s, want %s", n, test.want)
+		}
 	}
 }

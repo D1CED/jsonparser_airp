@@ -1,6 +1,7 @@
 package jsonparser_airp
 
 import (
+	"io/ioutil"
 	"strings"
 	"testing"
 )
@@ -40,6 +41,24 @@ func BenchmarkParser(b *testing.B) {
 		_, err := parse(inpc, func() {})
 		if err != nil {
 			b.Fatalf("non-valid token stream: %v", err)
+		}
+	}
+}
+
+func BenchmarkFormat(b *testing.B) {
+	input := `{"a":{"ab":[]},"b":[0,true,{}],"c":null,"d":0,"e":"",
+	"n":{"bool":true,"obj":{"v":null},"values":[{"a":5,"b":"hi","c":5.8,
+	"d":null,"e":true},{"a":[5,6,7,8],"b":"hi2","c":5.9,"d":{
+	"f":"Hello there!"},"e":false}]}}`
+	n, err := parse(lex(strings.NewReader(input)))
+	if err != nil {
+		b.Fatalf("benchmark setup failed: %v", err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err = n.format(ioutil.Discard, "~~", "^", "__", "==")
+		if err != nil {
+			b.Fatal(err)
 		}
 	}
 }

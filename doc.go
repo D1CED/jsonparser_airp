@@ -11,5 +11,6 @@ airp is partly comartible with encoding/json.
 Node fulfills the json.Marshaler/Unmarshaler interface.
 
 TODO(JMH): merge with dev_home and fix
+TODO(JMH): add better go-values interoperation
 */
 package jsonparser_airp // import "github.com/d1ced/jsonparser-airp"

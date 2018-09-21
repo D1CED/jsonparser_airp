@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // JSONType is an enum for any JSON-types
@@ -21,10 +24,11 @@ const (
 	Object
 )
 
-// Node is one node of tree building a JSON-ast.
-// Depending on its internal type it holds different values:
+// Node is one node of a tree building a JSON-AST.
+// Depending on its internal type it holds a different value:
 //     JSONType	ValueType
 //     Error	nil
+//     Null     nil
 //     Bool	bool
 //     Number	float64
 //     String	string
@@ -148,7 +152,7 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 			buf = append(buf, (postfix + strings.Repeat(prefix, level) + "]")...)
 			return nil
 		case Object:
-			cc := n.value.([]Node)
+			cc := m.value.([]Node)
 			if len(cc) == 0 {
 				buf = append(buf, (strings.Repeat(prefix, level) + "{}")...)
 				return nil
@@ -226,7 +230,7 @@ func (n *Node) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func eqNode(a, b *Node) bool {
+func EqNode(a, b *Node) bool {
 	if a == b {
 		return true
 	}
@@ -241,7 +245,7 @@ func eqNode(a, b *Node) bool {
 	bn, bok := b.value.([]Node)
 	if aok && bok && len(an) == len(bn) {
 		for i := range an {
-			if !eqNode(&an[i], &bn[i]) {
+			if !EqNode(&an[i], &bn[i]) {
 				return false
 			}
 		}
@@ -298,7 +302,7 @@ func (n *Node) AddChildren(nn ...Node) {
 	} else if n.jsonType == Array {
 		n.value = append(n.value.([]Node), nn...)
 	} else {
-		panic("n is not array or object")
+		panic(fmt.Errorf("n is not array or object %s", n.jsonType))
 	}
 }
 
@@ -308,4 +312,116 @@ func NewJSON(r io.Reader) (*Node, error) {
 
 func (n *Node) WriteJSON(w io.Writer) (int, error) {
 	return n.format(w, "", "", "", "")
+}
+
+func NewJSONGo(val interface{}) (*Node, error) {
+	if val == nil {
+		return &Node{jsonType: Null}, nil
+	}
+	v := reflect.ValueOf(val)
+	switch v.Kind() {
+	case reflect.Bool:
+		return &Node{jsonType: Bool, value: v.Bool()}, nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return &Node{jsonType: Number, value: float64(v.Int())}, nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return &Node{jsonType: Number, value: float64(v.Uint())}, nil
+	case reflect.Float32, reflect.Float64:
+		return &Node{jsonType: Number, value: v.Float()}, nil
+	case reflect.String:
+		return &Node{jsonType: String, value: v.String()}, nil
+	case reflect.Slice:
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			return &Node{jsonType: String, value: string(v.Bytes())}, nil
+		}
+		fallthrough
+	case reflect.Array:
+		nn := []Node(nil)
+		for i := 0; i < v.Len(); i++ {
+			n, err := NewJSONGo(v.Index(i).Interface())
+			if err != nil {
+				return nil, err
+			}
+			nn = append(nn, *n)
+		}
+		return &Node{jsonType: Array, value: nn}, nil
+	case reflect.Map:
+		nn := []Node(nil)
+		for _, key := range v.MapKeys() {
+			elem := v.MapIndex(key)
+			n, err := NewJSONGo(elem.Interface())
+			if err != nil {
+				return nil, err
+			}
+			n.key = key.String()
+			nn = append(nn, *n)
+		}
+		return &Node{jsonType: Object, value: nn}, nil
+	case reflect.Struct:
+		nn := []Node(nil)
+		t := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			if r, _ := utf8.DecodeRuneInString(t.Field(i).Name); !unicode.IsUpper(r) {
+				continue
+			}
+			n, err := NewJSONGo(v.Field(i).Interface())
+			if err != nil {
+				return nil, err
+			}
+			elemT := t.Field(i)
+			n.key = elemT.Tag.Get("json")
+			if n.key == "" {
+				n.key = elemT.Name
+			}
+			nn = append(nn, *n)
+		}
+		return &Node{jsonType: Object, value: nn}, nil
+	case reflect.Ptr:
+		return NewJSONGo(v.Elem().Interface())
+	default:
+		return nil, fmt.Errorf("invalid type %s", v.Kind())
+	}
+}
+
+func (n *Node) JSON2Go(v interface{}) (err error) {
+	r := reflect.ValueOf(v)
+	if !r.CanAddr() {
+		return fmt.Errorf("v %v not addressable", v)
+	}
+	if s, ok := v.(*interface{}); ok {
+		i, err := n.Value()
+		if err != nil {
+			return err
+		}
+		*s = i
+		return nil
+	}
+	// struct
+	i, err := n.Value()
+	if err != nil {
+		return err
+	}
+	// null case?
+	defer func() {
+		recover()
+		err = fmt.Errorf("bad type or nil derefernce")
+	}()
+	switch j := i.(type) {
+	case bool:
+		*v.(*bool) = j
+		return nil
+	case float64:
+		*v.(*float64) = j
+		return nil
+	case string:
+		*v.(*string) = j
+		return nil
+	case []interface{}:
+		*v.(*[]interface{}) = j
+		return nil
+	case map[string]interface{}:
+		*v.(*map[string]interface{}) = j
+		return nil
+	}
+	return fmt.Errorf("not implemented")
 }
