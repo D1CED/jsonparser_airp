@@ -266,28 +266,28 @@ func TestParseErr(t *testing.T) {
 }
 
 func TestFile(t *testing.T) {
-	want := &Node{jsonType: 6, value: []Node{
-		{key: "bool", jsonType: 2, value: true},
-		{key: "obj", jsonType: 6, value: []Node{
-			{key: "v", jsonType: 1, value: nil}}},
-		{key: "values", jsonType: 5, value: []Node{
-			{key: "", jsonType: 6, value: []Node{
-				{key: "a", jsonType: 3, value: 5.},
-				{key: "b", jsonType: 4, value: "hi"},
-				{key: "c", jsonType: 3, value: 5.8},
-				{key: "d", jsonType: 1, value: nil},
-				{key: "e", jsonType: 2, value: true}}},
-			{key: "", jsonType: 6, value: []Node{
-				{key: "a", jsonType: 5, value: []Node{
-					{key: "", jsonType: 3, value: 5.},
-					{key: "", jsonType: 3, value: 6.},
-					{key: "", jsonType: 3, value: 7.},
-					{key: "", jsonType: 3, value: 8.}}},
-				{key: "b", jsonType: 4, value: "hi2"},
-				{key: "c", jsonType: 3, value: 5.9},
-				{key: "d", jsonType: 6, value: []Node{
-					{key: "f", jsonType: 4, value: "Hello there!"}}},
-				{key: "e", jsonType: 2, value: false}}}}}}}
+	want := &Node{jsonType: Object, value: []Node{
+		{key: "bool", jsonType: Bool, value: true},
+		{key: "obj", jsonType: Object, value: []Node{
+			{key: "v", jsonType: Null, value: nil}}},
+		{key: "values", jsonType: Array, value: []Node{
+			{key: "", jsonType: Object, value: []Node{
+				{key: "a", jsonType: Number, value: 5.},
+				{key: "b", jsonType: String, value: "hi"},
+				{key: "c", jsonType: Number, value: 5.8},
+				{key: "d", jsonType: Null, value: nil},
+				{key: "e", jsonType: Bool, value: true}}},
+			{key: "", jsonType: Object, value: []Node{
+				{key: "a", jsonType: Array, value: []Node{
+					{key: "", jsonType: Number, value: 5.},
+					{key: "", jsonType: Number, value: 6.},
+					{key: "", jsonType: Number, value: 7.},
+					{key: "", jsonType: Number, value: 8.}}},
+				{key: "b", jsonType: String, value: "hi2"},
+				{key: "c", jsonType: Number, value: 5.9},
+				{key: "d", jsonType: Object, value: []Node{
+					{key: "f", jsonType: String, value: "Hello there!"}}},
+				{key: "e", jsonType: Bool, value: false}}}}}}}
 	data, err := ioutil.ReadFile("testfiles/test.json")
 	if err != nil {
 		t.Fatalf("failed reading golden file 'testfiles/test.json': %v", err)
@@ -460,3 +460,81 @@ func TestNewJSONGo(t *testing.T) {
 		}
 	}
 }
+
+func TestGetChild(t *testing.T) {
+	tests := []struct {
+		json  string
+		key   string
+		want  bool
+		value string
+	}{
+		{`[null,5,"hello there"]`, "2", true, `"hello there"`},
+		{`{"a":null,"b":5,"json":"hello there"}`, "json", true, `"hello there"`},
+		{`{"index":{"inner":[true]}}`, "index.inner.0", true, "true"},
+		// BUG(JMH): wrong closing order
+		{`{"index":[{"inner":[null,true]}}]`, "index.inner.0", false, ""},
+		{`{"index":[{"inner":[null,true]}]}`, "index.0.inner.1", true, "true"},
+		{`{"index":{"inner":[true]}}`, "index.iner.0", false, ""},
+	}
+	for _, test := range tests {
+		n, err := parse(lex(strings.NewReader(test.json)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m, ok := n.GetChild(test.key); ok != test.want {
+			t.Errorf("%s %s", test.json, test.key)
+		} else if ok && m.String() != test.value {
+			t.Errorf("%s %s", m, test.value)
+		}
+	}
+}
+
+func TestEqNode(t *testing.T) {
+	tests := []struct {
+		goval interface{}
+		json  string
+	}{
+		{5, "5"},
+		{nil, "null"},
+		{"hello", `"hello"`},
+		{[]bool{false, true}, "[false, true]"},
+		{map[string]interface{}{
+			"a":    true,
+			"long": 100000,
+		}, `{"long":100000,"a":true}`},
+	}
+	for _, test := range tests {
+		n, err := NewJSONGo(test.goval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, err := NewJSON(strings.NewReader(test.json))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !EqNode(n, m) {
+			t.Error(err)
+		}
+	}
+}
+
+/*
+func TestJSON2Go(t *testing.T) {
+	tests := []struct {
+		have string
+		want interface{}
+	}{
+		{"true", true},
+		{"52", 52},
+		{"3452.1", 3452.1},
+		{"3452.1", 3452.1},
+	}
+	for _, test := range tests {
+		n, err := parse(lex(test.have))
+		if err != nil {
+			t.Fatal("test setup fail")
+		}
+		n
+	}
+}
+*/

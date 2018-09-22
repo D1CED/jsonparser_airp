@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -14,6 +15,8 @@ import (
 type JSONType uint8
 
 //go:generate stringer -type JSONType
+
+// JSONTypes to caompare nodes of an ast with. The zero value signals invalid.
 const (
 	Error JSONType = iota
 	Null
@@ -42,6 +45,7 @@ type Node struct {
 }
 
 // Key returns the name of a Node.
+// TODO(JMH): make key up to root-node
 func (n *Node) Key() string {
 	if n == nil {
 		return ""
@@ -97,6 +101,9 @@ func (n *Node) Value() (interface{}, error) {
 	}
 }
 
+// format writes a valid json representation to w with prefix as indent,
+// postfix after values or opening objects/arrays, colonSep after keys and
+// commaSep after each comma.
 func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (int, error) {
 	if n == nil {
 		return 0, fmt.Errorf("<nil>")
@@ -193,7 +200,7 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 	return w.Write(buf)
 }
 
-// String formats an ast as valid JSON with few whitspace.
+// String formats an ast as valid JSON with no whitspace.
 func (n *Node) String() string {
 	b := &strings.Builder{}
 	_, err := n.format(b, "", "", "", "")
@@ -230,6 +237,8 @@ func (n *Node) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// EqNode compares the nodes and all their children. Object keys order is
+// abitary.
 func EqNode(a, b *Node) bool {
 	if a == b {
 		return true
@@ -237,21 +246,25 @@ func EqNode(a, b *Node) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	if !assertNodeType(a) || !assertNodeType(b) {
-		fmt.Printf("assertion failure, %v %T\n", a.jsonType, a.value)
-		return false
-	}
 	an, aok := a.value.([]Node)
 	bn, bok := b.value.([]Node)
-	if aok && bok && len(an) == len(bn) {
-		for i := range an {
-			if !EqNode(&an[i], &bn[i]) {
-				return false
+	if aok && bok && a.jsonType == b.jsonType && len(an) == len(bn) {
+		if a.jsonType == Array {
+			for i := range an {
+				if !EqNode(&an[i], &bn[i]) {
+					return false
+				}
 			}
+			return true
+		} else if a.jsonType == Object {
+			for i := range an {
+				if m, ok := b.GetChild(an[i].key); !ok && !EqNode(&an[i], m) {
+					return false
+				}
+			}
+			return true
 		}
-		return true
-	}
-	if a.key == b.key && a.jsonType == b.jsonType && a.value == b.value {
+	} else if a.key == b.key && a.jsonType == b.jsonType && a.value == b.value {
 		return true
 	}
 	return false
@@ -302,18 +315,30 @@ func (n *Node) AddChildren(nn ...Node) {
 	} else if n.jsonType == Array {
 		n.value = append(n.value.([]Node), nn...)
 	} else {
-		panic(fmt.Errorf("n is not array or object %s", n.jsonType))
+		panic(fmt.Errorf("n is not array or object: %s", n.jsonType))
 	}
 }
 
+// NewJSON reads from r and generates an AST
 func NewJSON(r io.Reader) (*Node, error) {
 	return parse(lex(r))
 }
 
+// WriteJSON writes the AST hold by n to w with the same representation as
+// n.String() and no whitspace.
 func (n *Node) WriteJSON(w io.Writer) (int, error) {
 	return n.format(w, "", "", "", "")
 }
 
+// WriteIndent writes the AST hold by n to w with the given indent
+// (preferably spaces or a tab).
+func (n *Node) WriteIndent(w io.Writer, indent string) (int, error) {
+	return n.format(w, indent, "\n", " ", " ")
+}
+
+// NewJSONGo reads in a Go-value and generates a json ast that can be
+// manipulated easily.
+// TODO(JMH): add full support for struct-tag options
 func NewJSONGo(val interface{}) (*Node, error) {
 	if val == nil {
 		return &Node{jsonType: Null}, nil
@@ -383,45 +408,154 @@ func NewJSONGo(val interface{}) (*Node, error) {
 	}
 }
 
-func (n *Node) JSON2Go(v interface{}) (err error) {
-	r := reflect.ValueOf(v)
-	if !r.CanAddr() {
+// GetChild returns the node specifiend by name.
+// GetChild panics if n is not of type array or object, but
+// the key "" always returns the node itself.
+func (n *Node) GetChild(name string) (*Node, bool) {
+	keys := strings.Split(name, ".")
+	if len(keys) == 1 && keys[0] == "" {
+		return n, true
+	}
+	switch n.jsonType {
+	case Object:
+		for _, c := range n.value.([]Node) {
+			if c.key == keys[0] {
+				return c.GetChild(strings.Join(keys[1:], "."))
+			}
+		}
+		return nil, false
+	case Array:
+		i, err := strconv.Atoi(keys[0])
+		if err != nil {
+			return nil, false
+		}
+		nn := n.value.([]Node)
+		if len(nn) < i {
+			return nil, false
+		}
+		return nn[i].GetChild(strings.Join(keys[1:], "."))
+	default:
+		panic(fmt.Errorf("not array or object: %v", n.jsonType))
+	}
+}
+
+// SetChild adds or replaces the child key of n with val.
+// SetChild does not add multiple level of objects.
+// SetChild panics a to extended object is not array or object.
+func (n *Node) SetChild(key string, val *Node) error {
+	m, ok := n.GetChild(key)
+	keys := strings.Split(key, ".")
+	if ok {
+		val.key = keys[len(keys)-1]
+		*m = *val
+		return nil
+	}
+	if len(keys) > 1 {
+		m, ok = n.GetChild(keys[len(keys)-2])
+		if ok {
+			if m.jsonType == Array {
+				idx, err := strconv.Atoi(keys[len(keys)-1])
+				if err != nil {
+					return err
+				}
+				if m.Len() < idx+1 {
+					return fmt.Errorf("too short")
+				}
+			} else if m.jsonType == Object {
+
+			}
+			return fmt.Errorf("not array or object")
+		}
+	}
+	return fmt.Errorf("not array or object")
+}
+
+// Len gives the length of an array or items in an object
+func (n *Node) Len() int {
+	switch n.Type() {
+	case Array, Object:
+		return len(n.value.([]Node))
+	case Error:
+		return 0
+	default:
+		return 1
+	}
+}
+
+// Total returns the number of total nodes hold by n
+func (n *Node) Total() int {
+	switch n.Type() {
+	case Array, Object:
+		i := 0
+		for _, eml := range n.value.([]Node) {
+			i += eml.Total()
+		}
+		return i + 1
+	default:
+		return n.Len()
+	}
+}
+
+// RemoveChild removes key from the ast corrctly reducing arrays
+func (n *Node) RemoveChild(key string) {
+	keys := strings.Split(key, ".")
+	if len(keys) == 0 {
+		return
+	}
+	if len(keys) == 1 {
+		nn := n.value.([]Node)
+		for i, m := range nn {
+			if keys[0] == m.key {
+				nn = append(nn[:i], nn[i+1:]...)
+			}
+		}
+	}
+	m, ok := n.GetChild(strings.Join(keys[:len(keys)-1], "."))
+	if ok {
+		nn := m.value.([]Node)
+		for i, o := range nn {
+			if keys[0] == o.key {
+				nn = append(nn[:i], nn[i+1:]...)
+			}
+		}
+	}
+}
+
+// GetChildrenKeys returns a slice of all keys an Object or array holds.
+// It is nil if n is not array or object and is not nil but is non-nil with
+// a lengh of 0 if n is an empty array or object.
+func (n *Node) GetChildrenKeys() []string {
+	switch n.Type() {
+	case Object:
+		nn := n.value.([]Node)
+		ss := make([]string, len(nn))
+		for i, m := range nn {
+			ss[i] = m.Key()
+		}
+		return ss
+	case Array:
+		nn := n.value.([]Node)
+		ss := make([]string, len(nn))
+		for i := range nn {
+			ss[i] = strconv.Itoa(i)
+		}
+		return ss
+	default:
+		return nil
+	}
+}
+
+// JSON2Go reads contents from n and writes them into val.
+// val has to be a pointer value and may panic if types don't match.
+// TODO(JMH): implement
+func (n *Node) JSON2Go(val interface{}) error {
+	v := reflect.ValueOf(val)
+	if !v.CanAddr() || v.Kind() != reflect.Ptr {
 		return fmt.Errorf("v %v not addressable", v)
 	}
-	if s, ok := v.(*interface{}); ok {
-		i, err := n.Value()
-		if err != nil {
-			return err
-		}
-		*s = i
-		return nil
+	switch v.Kind() {
+
+	default:
+		return fmt.Errorf("not implemented")
 	}
-	// struct
-	i, err := n.Value()
-	if err != nil {
-		return err
-	}
-	// null case?
-	defer func() {
-		recover()
-		err = fmt.Errorf("bad type or nil derefernce")
-	}()
-	switch j := i.(type) {
-	case bool:
-		*v.(*bool) = j
-		return nil
-	case float64:
-		*v.(*float64) = j
-		return nil
-	case string:
-		*v.(*string) = j
-		return nil
-	case []interface{}:
-		*v.(*[]interface{}) = j
-		return nil
-	case map[string]interface{}:
-		*v.(*map[string]interface{}) = j
-		return nil
-	}
-	return fmt.Errorf("not implemented")
 }

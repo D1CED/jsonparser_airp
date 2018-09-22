@@ -3,7 +3,7 @@ package jsonparser_airp_test
 import (
 	"fmt"
 
-	airp "github.com/d1ced/jsonparser-airp"
+	airp "github.com/d1ced/jsonparser_airp"
 )
 
 func ExampleNode_MarshalJSON() {

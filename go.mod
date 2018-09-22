@@ -1,1 +1,1 @@
-module github.com/d1ced/jsonparser-airp
+module github.com/d1ced/jsonparser_airp
