@@ -206,6 +206,12 @@ func TestParseErr(t *testing.T) {
 		have string
 		want ParseError
 	}{
+		{"", ParseError{msg: "value"}},
+		{"null 5", ParseError{
+			msg:    "delimiter",
+			token:  token{Type: numberToken, Value: "5", Position: [2]int{0, 5}},
+			before: token{Type: nullToken, Position: [2]int{0, 0}},
+		}},
 		{`{"a": nul}`, ParseError{
 			msg:        "value",
 			token:      token{Value: "nul", Position: [2]int{0, 6}},
@@ -578,8 +584,8 @@ func TestJSON2Go(t *testing.T) {
 		}{}, struct {
 			A int  `json:"a"`
 			B bool `json:"b"`
-		}{52, true},
-		}, {`{"Str":true,"bool":false,"This":5}`, &struct {
+		}{52, true}},
+		{`{"Str":true,"bool":false,"This":5}`, &struct {
 			Str  string `json:",string"`
 			Bool bool   `json:"bool"`
 			This int    `json:"-"`
@@ -588,11 +594,20 @@ func TestJSON2Go(t *testing.T) {
 			Bool bool   `json:"bool"`
 			This int    `json:"-"`
 		}{Str: "true", Bool: false}},
+		{`{"a":true,"bool":false,"This":5}`, &struct {
+			Str  string `json:"bool,string"`
+			Bool bool   `json:"a,"`
+			This int    `json:",omitempty"`
+		}{}, struct {
+			Str  string `json:"bool,string"`
+			Bool bool   `json:"a,"`
+			This int    `json:",omitempty"`
+		}{Str: "false", Bool: true, This: 5}},
 	}
 	for _, test := range tests {
 		n, err := parse(lex(strings.NewReader(test.have)))
 		if err != nil {
-			t.Fatal("test setup fail")
+			t.Fatalf("test setup fail: %v", err)
 		}
 		err = n.JSON2Go(test.store)
 		if err != nil {

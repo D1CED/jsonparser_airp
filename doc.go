@@ -17,8 +17,8 @@ Some differences between this package and encoding/json:
       encoded data
 
 TODO(JMH): make object map and remove key or []struct{key string; Node}
-TODO(JMH): wrap lexers bufreader with row and col
+TODO(JMH): correct escape sequences is strings
 TODO(JMH): reimplement lexer and parser
-TODO(JMH): merge with dev_home and fix
+TODO(JMH): merge with dev_home
 */
 package jsonparser_airp // import "github.com/d1ced/jsonparser-airp"

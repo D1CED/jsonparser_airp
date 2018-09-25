@@ -2,8 +2,11 @@ package jsonparser_airp
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 )
+
+var keyRegex = regexp.MustCompile(`[[:alpha:]][[:word:]]*`)
 
 // parser is a state machine creating an ast from lex tokens
 // the parser is only allowed to cancel it if recieves an error from the lexer
@@ -46,6 +49,9 @@ func expektKey(p *parser) (parseFunc, error) {
 	}
 	if t.Type != stringToken {
 		return nil, newParseError("key", p.prev, t, p.ast)
+	}
+	if t.Value != keyRegex.FindString(t.Value) {
+		return nil, newParseError("valid key", p.prev, t, p.ast)
 	}
 	p.ast.key = t.Value
 	p.prev, t = t, <-p.in

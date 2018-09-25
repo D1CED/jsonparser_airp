@@ -4,7 +4,7 @@ See doc.go and use [`go doc github.com/D1CED/jsonparser_airp`](https://www.godoc
 For usage look into 'example\_test.go'.
 
 ```
-go get github.com/D1CED/jsonparser_airp@v0.9.8
+go get github.com/D1CED/jsonparser_airp
 ```
 
 This package is inspired by:
