@@ -1,6 +1,9 @@
 package jsonparser_airp
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
 // parser is a state machine creating an ast from lex tokens
 // the parser is only allowed to cancel it if recieves an error from the lexer
@@ -136,8 +139,22 @@ func expektDelim(p *parser) (parseFunc, error) {
 		if p.ast.parent == nil {
 			return nil, newParseError("to be in array or object", p.prev, t, p.ast)
 		}
-		p.ast = p.ast.parent
-		return expektDelim, nil
+		switch p.ast.parent.jsonType {
+		case Array:
+			if t.Type != arrayCToken {
+				return nil, newParseError("array closing", p.prev, t, p.ast)
+			}
+			p.ast = p.ast.parent
+			return expektDelim, nil
+		case Object:
+			if t.Type != objectCToken {
+				return nil, newParseError("object closing", p.prev, t, p.ast)
+			}
+			p.ast = p.ast.parent
+			return expektDelim, nil
+		default:
+			return nil, fmt.Errorf("not in array or object: %s", p.ast.parent.jsonType)
+		}
 	default:
 		return nil, newParseError("delimiter", p.prev, t, p.ast)
 	}

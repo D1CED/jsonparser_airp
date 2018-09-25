@@ -15,85 +15,96 @@ func TestLexer(t *testing.T) {
 		want []token
 	}{
 		{`{"a": null}`, []token{
-			{Type: objectOToken},
-			{Type: stringToken, Value: "a"},
-			{Type: colonToken},
-			{Type: nullToken},
-			{Type: objectCToken},
+			{Type: objectOToken, Position: [2]int{0, 0}},
+			{Type: stringToken, Value: "a", Position: [2]int{0, 1}},
+			{Type: colonToken, Position: [2]int{0, 4}},
+			{Type: nullToken, Position: [2]int{0, 6}},
+			{Type: objectCToken, Position: [2]int{0, 10}},
 		}},
 		{`[false, -31.2, 5, "ab\"cd"]`, []token{
-			{Type: arrayOToken},
-			{Type: falseToken},
-			{Type: commaToken},
-			{Type: numberToken, Value: "-31.2"},
-			{Type: commaToken},
-			{Type: numberToken, Value: "5"},
-			{Type: commaToken},
-			{Type: stringToken, Value: "ab\\\"cd"},
-			{Type: arrayCToken},
+			{Type: arrayOToken, Position: [2]int{0, 0}},
+			{Type: falseToken, Position: [2]int{0, 1}},
+			{Type: commaToken, Position: [2]int{0, 6}},
+			{Type: numberToken, Value: "-31.2", Position: [2]int{0, 8}},
+			{Type: commaToken, Position: [2]int{0, 13}},
+			{Type: numberToken, Value: "5", Position: [2]int{0, 15}},
+			{Type: commaToken, Position: [2]int{0, 16}},
+			{Type: stringToken, Value: "ab\\\"cd", Position: [2]int{0, 18}},
+			{Type: arrayCToken, Position: [2]int{0, 26}},
 		}},
 		{`{"a": 20, "b": [true, null]}`, []token{
-			{Type: objectOToken},
-			{Type: stringToken, Value: "a"},
-			{Type: colonToken},
-			{Type: numberToken, Value: "20"},
-			{Type: commaToken},
-			{Type: stringToken, Value: "b"},
-			{Type: colonToken},
-			{Type: arrayOToken},
-			{Type: trueToken},
-			{Type: commaToken},
-			{Type: nullToken},
-			{Type: arrayCToken},
-			{Type: objectCToken},
+			{Type: objectOToken, Position: [2]int{0, 0}},
+			{Type: stringToken, Value: "a", Position: [2]int{0, 1}},
+			{Type: colonToken, Position: [2]int{0, 4}},
+			{Type: numberToken, Value: "20", Position: [2]int{0, 6}},
+			{Type: commaToken, Position: [2]int{0, 8}},
+			{Type: stringToken, Value: "b", Position: [2]int{0, 10}},
+			{Type: colonToken, Position: [2]int{0, 13}},
+			{Type: arrayOToken, Position: [2]int{0, 15}},
+			{Type: trueToken, Position: [2]int{0, 16}},
+			{Type: commaToken, Position: [2]int{0, 20}},
+			{Type: nullToken, Position: [2]int{0, 22}},
+			{Type: arrayCToken, Position: [2]int{0, 26}},
+			{Type: objectCToken, Position: [2]int{0, 27}},
 		}},
 		{`[0]`, []token{
-			{Type: arrayOToken},
-			{Type: numberToken, Value: "0"},
-			{Type: arrayCToken},
+			{Type: arrayOToken, Position: [2]int{0, 0}},
+			{Type: numberToken, Value: "0", Position: [2]int{0, 1}},
+			{Type: arrayCToken, Position: [2]int{0, 2}},
 		}},
 		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, []token{
-			{Type: objectOToken},
-			{Type: stringToken, Value: "a"},
-			{Type: colonToken},
-			{Type: objectOToken},
-			{Type: objectCToken},
-			{Type: commaToken},
-			{Type: stringToken, Value: "b"},
-			{Type: colonToken},
-			{Type: arrayOToken},
-			{Type: arrayCToken},
-			{Type: commaToken},
-			{Type: stringToken, Value: "c"},
-			{Type: colonToken},
-			{Type: nullToken},
-			{Type: commaToken},
-			{Type: stringToken, Value: "d"},
-			{Type: colonToken},
-			{Type: numberToken, Value: "0"},
-			{Type: commaToken},
-			{Type: stringToken, Value: "e"},
-			{Type: colonToken},
-			{Type: stringToken},
-			{Type: objectCToken},
+			{Type: objectOToken, Position: [2]int{0, 0}},
+			{Type: stringToken, Value: "a", Position: [2]int{0, 1}},
+			{Type: colonToken, Position: [2]int{0, 4}},
+			{Type: objectOToken, Position: [2]int{0, 5}},
+			{Type: objectCToken, Position: [2]int{0, 6}},
+			{Type: commaToken, Position: [2]int{0, 7}},
+			{Type: stringToken, Value: "b", Position: [2]int{0, 8}},
+			{Type: colonToken, Position: [2]int{0, 11}},
+			{Type: arrayOToken, Position: [2]int{0, 12}},
+			{Type: arrayCToken, Position: [2]int{0, 13}},
+			{Type: commaToken, Position: [2]int{0, 14}},
+			{Type: stringToken, Value: "c", Position: [2]int{0, 15}},
+			{Type: colonToken, Position: [2]int{0, 18}},
+			{Type: nullToken, Position: [2]int{0, 19}},
+			{Type: commaToken, Position: [2]int{0, 23}},
+			{Type: stringToken, Value: "d", Position: [2]int{0, 24}},
+			{Type: colonToken, Position: [2]int{0, 27}},
+			{Type: numberToken, Value: "0", Position: [2]int{0, 28}},
+			{Type: commaToken, Position: [2]int{0, 29}},
+			{Type: stringToken, Value: "e", Position: [2]int{0, 30}},
+			{Type: colonToken, Position: [2]int{0, 33}},
+			{Type: stringToken, Position: [2]int{0, 34}},
+			{Type: objectCToken, Position: [2]int{0, 36}},
+		}},
+		{`{"index":[{"inner":[null,true]}}]`, []token{
+			{Type: objectOToken, Position: [2]int{0, 0}},
+			{Type: stringToken, Value: "index", Position: [2]int{0, 1}},
+			{Type: colonToken, Position: [2]int{0, 8}},
+			{Type: arrayOToken, Position: [2]int{0, 9}},
+			{Type: objectOToken, Position: [2]int{0, 10}},
+			{Type: stringToken, Value: "inner", Position: [2]int{0, 11}},
+			{Type: colonToken, Position: [2]int{0, 18}},
+			{Type: arrayOToken, Position: [2]int{0, 19}},
+			{Type: nullToken, Position: [2]int{0, 20}},
+			{Type: commaToken, Position: [2]int{0, 24}},
+			{Type: trueToken, Position: [2]int{0, 25}},
+			{Type: arrayCToken, Position: [2]int{0, 29}},
+			{Type: objectCToken, Position: [2]int{0, 30}},
+			{Type: objectCToken, Position: [2]int{0, 31}},
+			{Type: arrayCToken, Position: [2]int{0, 32}},
 		}},
 	}
+outer:
 	for _, test := range tests {
 		lexc, q := lex(strings.NewReader(test.have))
-		first := true
 		for _, w := range test.want {
 			tk := <-lexc
-			if tk.Type != w.Type || tk.Value != w.Value {
-				t.Errorf("have %v, got %s, want %s", test.have, tk.String(), w)
+			if tk != w {
+				t.Errorf("have %v, got %s, want %s", test.have, tk, w)
 				q()
-				return
+				continue outer
 			}
-			if !first && tk.Position == [2]int{} {
-				t.Errorf("token %s is missing position", tk.String())
-				q()
-				return
-			}
-			first = false
 		}
 		if tk, ok := <-lexc; ok {
 			t.Errorf("expected nothing, got %s", tk.String())
@@ -183,7 +194,8 @@ func TestParser(t *testing.T) {
 		}},
 	}
 	for i, test := range tests {
-		if ast, err := parse(lex(strings.NewReader(test.have))); err != nil || !EqNode(ast, &test.want) {
+		ast, err := parse(lex(strings.NewReader(test.have)))
+		if err != nil || !EqNode(ast, &test.want) {
 			t.Errorf("for %v, got %v, with err: %v; %d", &test.want, ast, err, i)
 		}
 	}
@@ -252,15 +264,22 @@ func TestParseErr(t *testing.T) {
 			msg:   "value",
 			token: token{Value: "abcdefghij", Position: [2]int{0, 0}},
 		}},
+		{`{"index":[{"inner":[null,true]}}]`, ParseError{
+			msg:        "array closing",
+			token:      token{Type: objectCToken, Position: [2]int{0, 31}},
+			before:     token{Type: objectCToken, Position: [2]int{0, 30}},
+			parentType: Array,
+			key:        "index",
+		}},
 	}
 	for _, test := range tests {
 		_, err := parse(lex(strings.NewReader(test.have)))
 		pErr, ok := err.(*ParseError)
 		if !ok {
-			t.Fatal("error is not of type parse error in test")
+			t.Fatalf("error is not of type parse error in test: %T", err)
 		}
 		if *pErr != test.want {
-			t.Errorf("got %v, want %v, for %v", pErr, test.want, test.have)
+			t.Errorf("got %v, want %s, for %v", pErr, test.want.Error(), test.have)
 		}
 	}
 }
@@ -471,8 +490,7 @@ func TestGetChild(t *testing.T) {
 		{`[null,5,"hello there"]`, "2", true, `"hello there"`},
 		{`{"a":null,"b":5,"json":"hello there"}`, "json", true, `"hello there"`},
 		{`{"index":{"inner":[true]}}`, "index.inner.0", true, "true"},
-		// BUG(JMH): wrong closing order
-		{`{"index":[{"inner":[null,true]}}]`, "index.inner.0", false, ""},
+		{`{"index":[{"inner":[null,true]}]}`, "index.inner.0", false, ""},
 		{`{"index":[{"inner":[null,true]}]}`, "index.0.inner.1", true, "true"},
 		{`{"index":{"inner":[true]}}`, "index.iner.0", false, ""},
 	}
@@ -518,23 +536,55 @@ func TestEqNode(t *testing.T) {
 	}
 }
 
-/*
-func TestJSON2Go(t *testing.T) {
+func TestLen(t *testing.T) {
 	tests := []struct {
-		have string
-		want interface{}
+		json string
+		len  int
 	}{
-		{"true", true},
-		{"52", 52},
-		{"3452.1", 3452.1},
-		{"3452.1", 3452.1},
+		{"true", 1},
+		{"{}", 0},
+		{`{"a":5,"b":null}`, 2},
+		{"[1,2,3,4,5,6,7,8,9]", 9},
 	}
 	for _, test := range tests {
-		n, err := parse(lex(test.have))
+		n, err := NewJSON(strings.NewReader(test.json))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n.Len() != test.len {
+			t.Errorf("want %v got %v for %v", test.len, n.Len(), test.json)
+		}
+	}
+}
+
+func TestJSON2Go(t *testing.T) {
+	tests := []struct {
+		have  string
+		store interface{}
+		want  interface{}
+	}{
+		{"true", new(bool), true},
+		{"52", new(int), 52},
+		{"3452.1", new(float64), 3452.1},
+		{"3452.1", new(float32), float32(3452.1)},
+		{`"Hello, World!"`, new(string), "Hello, World!"},
+		{`[true, "hi"]`, &[]interface{}{}, []interface{}{true, "hi"}},
+		{`[52, 420]`, &[]float64{}, []float64{52, 420}},
+		{`[52, 420]`, &[]int{}, []int{52, 420}},
+	}
+	for _, test := range tests {
+		n, err := parse(lex(strings.NewReader(test.have)))
 		if err != nil {
 			t.Fatal("test setup fail")
 		}
-		n
+		err = n.JSON2Go(test.store)
+		if err != nil {
+			t.Error(err)
+			break
+		}
+		got := reflect.ValueOf(test.store).Elem().Interface()
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("want %v got %v", test.want, got)
+		}
 	}
 }
-*/

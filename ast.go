@@ -270,6 +270,7 @@ func EqNode(a, b *Node) bool {
 	return false
 }
 
+// -> IsValid
 func assertNodeType(n *Node) bool {
 	switch n.value.(type) {
 	case nil:
@@ -547,14 +548,67 @@ func (n *Node) GetChildrenKeys() []string {
 
 // JSON2Go reads contents from n and writes them into val.
 // val has to be a pointer value and may panic if types don't match.
-// TODO(JMH): implement
-func (n *Node) JSON2Go(val interface{}) error {
+func (n *Node) JSON2Go(val interface{}) (err error) {
 	v := reflect.ValueOf(val)
-	if !v.CanAddr() || v.Kind() != reflect.Ptr {
-		return fmt.Errorf("v %v not addressable", v)
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("v %v not pointer", v)
 	}
-	switch v.Kind() {
-
+	switch inner := v.Elem(); inner.Kind() {
+	case reflect.Bool:
+		if n.jsonType != Bool {
+			return fmt.Errorf("mismatched type: want Bool got %s", n.jsonType)
+		}
+		inner.SetBool(n.value.(bool))
+		return nil
+	case reflect.Float64, reflect.Float32:
+		if n.jsonType != Number {
+			return fmt.Errorf("mismatched type: want Number got %s", n.jsonType)
+		}
+		inner.SetFloat(n.value.(float64))
+		return nil
+	case reflect.Int, reflect.Int64, reflect.Int32:
+		if n.jsonType != Number {
+			return fmt.Errorf("mismatched type: want Number got %s", n.jsonType)
+		}
+		inner.SetInt(int64(n.value.(float64)))
+		return nil
+	case reflect.Uint, reflect.Uint64, reflect.Uint32:
+		if n.jsonType != Number {
+			return fmt.Errorf("mismatched type: want Number got %s", n.jsonType)
+		}
+		inner.SetUint(uint64(n.value.(float64)))
+		return nil
+	case reflect.String:
+		if n.jsonType != String {
+			return fmt.Errorf("mismatched type: want String got %s", n.jsonType)
+		}
+		inner.SetString(n.value.(string))
+		return nil
+	case reflect.Slice:
+		if n.jsonType != Array {
+			return fmt.Errorf("mismatched type: want Array got %s", n.jsonType)
+		}
+		t := inner.Type().Elem() // interface{}
+		nn := n.value.([]Node)
+		defer func() {
+			if e := recover(); e != nil {
+				switch val := e.(type) {
+				case error:
+					err = val
+				case string:
+					err = fmt.Errorf(val)
+				default:
+					err = fmt.Errorf("incomparible types in array")
+				}
+			}
+		}()
+		for _, m := range nn {
+			inner.Set(reflect.Append(inner, reflect.
+				ValueOf(m.value).
+				Convert(t)))
+		}
+		// TODO(JMH): do!
+		return nil
 	default:
 		return fmt.Errorf("not implemented")
 	}

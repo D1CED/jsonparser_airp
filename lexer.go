@@ -69,7 +69,6 @@ func noneMode(l *lexer) lexFunc {
 		l.col++
 		return m
 	case '"':
-		l.col++
 		return stringMode
 	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		l.reader.UnreadRune()
@@ -84,9 +83,8 @@ func stringMode(l *lexer) lexFunc {
 	r, _, err := l.reader.ReadRune()
 	if err != nil {
 		lexSend(l, nil, token{
-			Type:     errToken,
 			Value:    `"` + l.buf.String(),
-			Position: [2]int{l.row, l.col - utf8.RuneCount(l.buf.Bytes())},
+			Position: [2]int{l.row, l.col},
 		})
 		return nil
 	}
@@ -99,21 +97,19 @@ func stringMode(l *lexer) lexFunc {
 			})
 			return nil
 		}
-		l.col++
 		return stringMode
 	}
 	if r == '"' {
 		m := lexSend(l, noneMode, token{
 			Type:     stringToken,
 			Value:    l.buf.String(),
-			Position: [2]int{l.row, l.col - utf8.RuneCount(l.buf.Bytes()) - 1},
+			Position: [2]int{l.row, l.col},
 		})
-		l.col += utf8.RuneCount(l.buf.Bytes())
+		l.col += utf8.RuneCount(l.buf.Bytes()) + 2
 		l.buf.Reset()
 		return m
 	}
 	l.buf.WriteRune(r)
-	l.col++
 	return stringMode
 }
 
@@ -162,7 +158,7 @@ func otherMode(l *lexer) lexFunc {
 errL:
 	for i, r := range l.buf.String() {
 		switch r {
-		case ' ', '\t', '\r', '\n', '{', '[', '}', ']', ',', ':':
+		case ' ', '\t', '\r', '\n', '{', '[', ']', '}', ',', ':':
 			lexSend(l, nil, token{
 				Value:    l.buf.String()[:i],
 				Position: [2]int{l.row, l.col},
