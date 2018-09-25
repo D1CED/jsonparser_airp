@@ -571,6 +571,23 @@ func TestJSON2Go(t *testing.T) {
 		{`[true, "hi"]`, &[]interface{}{}, []interface{}{true, "hi"}},
 		{`[52, 420]`, &[]float64{}, []float64{52, 420}},
 		{`[52, 420]`, &[]int{}, []int{52, 420}},
+		{`{"a":52,"b":420}`, &map[string]int{}, map[string]int{"a": 52, "b": 420}},
+		{`{"a":52,"b":true}`, &struct {
+			A int  `json:"a"`
+			B bool `json:"b"`
+		}{}, struct {
+			A int  `json:"a"`
+			B bool `json:"b"`
+		}{52, true},
+		}, {`{"Str":true,"bool":false,"This":5}`, &struct {
+			Str  string `json:",string"`
+			Bool bool   `json:"bool"`
+			This int    `json:"-"`
+		}{}, struct {
+			Str  string `json:",string"`
+			Bool bool   `json:"bool"`
+			This int    `json:"-"`
+		}{Str: "true", Bool: false}},
 	}
 	for _, test := range tests {
 		n, err := parse(lex(strings.NewReader(test.have)))
@@ -580,7 +597,7 @@ func TestJSON2Go(t *testing.T) {
 		err = n.JSON2Go(test.store)
 		if err != nil {
 			t.Error(err)
-			break
+			continue
 		}
 		got := reflect.ValueOf(test.store).Elem().Interface()
 		if !reflect.DeepEqual(got, test.want) {

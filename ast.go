@@ -395,7 +395,8 @@ func NewJSONGo(val interface{}) (*Node, error) {
 				return nil, err
 			}
 			elemT := t.Field(i)
-			n.key = elemT.Tag.Get("json")
+			tags := strings.Split(elemT.Tag.Get("json"), ",")
+			n.key = tags[0]
 			if n.key == "" {
 				n.key = elemT.Name
 			}
@@ -549,6 +550,10 @@ func (n *Node) GetChildrenKeys() []string {
 // JSON2Go reads contents from n and writes them into val.
 // val has to be a pointer value and may panic if types don't match.
 func (n *Node) JSON2Go(val interface{}) (err error) {
+	return json2Go(n, val, false)
+}
+
+func json2Go(n *Node, val interface{}, stringify bool) (err error) {
 	v := reflect.ValueOf(val)
 	if v.Kind() != reflect.Ptr {
 		return fmt.Errorf("v %v not pointer", v)
@@ -560,30 +565,42 @@ func (n *Node) JSON2Go(val interface{}) (err error) {
 		}
 		inner.SetBool(n.value.(bool))
 		return nil
-	case reflect.Float64, reflect.Float32:
+	case reflect.Float64, reflect.Float32,
+		reflect.Int, reflect.Int64, reflect.Int32,
+		reflect.Uint, reflect.Uint64, reflect.Uint32:
 		if n.jsonType != Number {
 			return fmt.Errorf("mismatched type: want Number got %s", n.jsonType)
 		}
-		inner.SetFloat(n.value.(float64))
-		return nil
-	case reflect.Int, reflect.Int64, reflect.Int32:
-		if n.jsonType != Number {
-			return fmt.Errorf("mismatched type: want Number got %s", n.jsonType)
-		}
-		inner.SetInt(int64(n.value.(float64)))
-		return nil
-	case reflect.Uint, reflect.Uint64, reflect.Uint32:
-		if n.jsonType != Number {
-			return fmt.Errorf("mismatched type: want Number got %s", n.jsonType)
-		}
-		inner.SetUint(uint64(n.value.(float64)))
+		inner.Set(reflect.ValueOf(n.value).Convert(inner.Type()))
 		return nil
 	case reflect.String:
-		if n.jsonType != String {
-			return fmt.Errorf("mismatched type: want String got %s", n.jsonType)
+		if !stringify {
+			if n.jsonType != String {
+				return fmt.Errorf("mismatched type: want String got %s", n.jsonType)
+			}
+			inner.SetString(n.value.(string))
+			return nil
 		}
-		inner.SetString(n.value.(string))
-		return nil
+		switch n.jsonType {
+		case Null:
+			inner.SetString("null")
+			return nil
+		case Bool:
+			if n.value.(bool) {
+				inner.SetString("true")
+				return nil
+			}
+			inner.SetString("false")
+			return nil
+		case Number:
+			inner.SetString(strconv.FormatFloat(n.value.(float64), 'b', -1, 64))
+			return nil
+		case String:
+			inner.SetString(n.value.(string))
+			return nil
+		default:
+			return fmt.Errorf("mismatched type: can not convert %s to string", n.jsonType)
+		}
 	case reflect.Slice:
 		if n.jsonType != Array {
 			return fmt.Errorf("mismatched type: want Array got %s", n.jsonType)
@@ -607,9 +624,72 @@ func (n *Node) JSON2Go(val interface{}) (err error) {
 				ValueOf(m.value).
 				Convert(t)))
 		}
-		// TODO(JMH): do!
+		return nil
+	case reflect.Struct:
+		t := inner.Type()
+		for i := 0; i < t.NumField(); i++ {
+			elemT := t.Field(i)
+			if r, _ := utf8.DecodeRuneInString(elemT.Name); !unicode.IsUpper(r) {
+				continue
+			}
+			tags := strings.Split(elemT.Tag.Get("json"), ",")
+			if len(tags) == 1 && tags[0] == "-" {
+				continue
+			}
+			key := tags[0]
+			if key == "" {
+				key = elemT.Name
+			}
+			elm, ok := n.GetChild(key)
+			if !ok {
+				omitempty := false
+				for _, tag := range tags[1:] {
+					if tag == "omitempty" {
+						omitempty = true
+						break
+					}
+				}
+				if omitempty {
+					continue
+				}
+				return fmt.Errorf("key in json missing")
+			}
+			strfy := false
+			for _, tag := range tags[1:] {
+				if tag == "string" {
+					strfy = true
+				}
+			}
+			err = json2Go(elm, inner.Field(i).Addr().Interface(), strfy)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	case reflect.Map:
+		if n.jsonType != Object {
+			return fmt.Errorf("mismatched type: want Object got %s", n.jsonType)
+		}
+		t := inner.Type()
+		defer func() {
+			if e := recover(); e != nil {
+				switch val := e.(type) {
+				case error:
+					err = val
+				case string:
+					err = fmt.Errorf(val)
+				default:
+					err = fmt.Errorf("incomparible types in array")
+				}
+			}
+		}()
+		for _, nn := range n.value.([]Node) {
+			inner.SetMapIndex(reflect.ValueOf(nn.key), reflect.
+				ValueOf(nn.value).
+				Convert(t.Elem()))
+		}
 		return nil
 	default:
-		return fmt.Errorf("not implemented")
+		return fmt.Errorf("invalid type supplied")
 	}
 }
