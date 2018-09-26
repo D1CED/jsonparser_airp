@@ -1,9 +1,13 @@
 package jsonparser_airp
 
 import (
+	"errors"
 	"fmt"
-	"strings"
 )
+
+// ErrNotArrayOrObject is a common error that multiple methods of Node
+// or KeyNode return. This signals that the Node type is a standalone value.
+var ErrNotArrayOrObject = errors.New("not array or object")
 
 // ParseError captures information on errors when parsing.
 type ParseError struct {
@@ -16,7 +20,7 @@ type ParseError struct {
 
 func newParseError(msg string, before, after token, ast *Node) *ParseError {
 	parent := parentType(ast)
-	key := currentKey(ast)
+	key := ast.Key()
 	return &ParseError{
 		msg:        msg,
 		before:     before,
@@ -35,8 +39,8 @@ func (e *ParseError) Error() string {
 			e.token.Error(), e.msg, e.before.String())
 	}
 	if e.key == "" {
-		return fmt.Sprintf("%s; expected %s token after %s (in top-level %s)",
-			e.token.Error(), e.msg, e.before.String(), e.parentType)
+		return fmt.Sprintf("%s; expected %s token after %s (in top-level value)",
+			e.token.Error(), e.msg, e.before.String())
 	}
 	return fmt.Sprintf("%s; expected %s token after %s (at %s in %s)",
 		e.token.Error(), e.msg, e.before.String(), e.key, e.parentType)
@@ -54,20 +58,4 @@ func parentType(n *Node) JSONType {
 		return Error
 	}
 	return n.parent.jsonType
-}
-
-func currentKey(n *Node) string {
-	ss := make([]string, 0, 4)
-	for o := n; o != nil; o = o.parent {
-		if o.key != "" {
-			ss = append(ss, o.key)
-		} else if o.jsonType == Array {
-			ss = append(ss, fmt.Sprint(len(o.value.([]Node))-1))
-		}
-	}
-	rr := make([]string, len(ss))
-	for i, s := range ss {
-		rr[len(ss)-i-1] = s
-	}
-	return strings.Join(rr, ".")
 }

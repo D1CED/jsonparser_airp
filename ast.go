@@ -9,6 +9,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/pkg/errors"
 )
 
 // JSONType is an enum for any JSON-types
@@ -36,21 +38,46 @@ const (
 //     Number	float64
 //     String	string
 //     Array	[]Node
-//     Object	[]Node
+//     Object	[]keyNode
 type Node struct {
-	key      string
 	jsonType JSONType
 	value    interface{}
 	parent   *Node
 }
 
+type KeyNode struct {
+	key string
+	Node
+}
+
 // Key returns the name of a Node.
-// TODO(JMH): make key up to root-node
 func (n *Node) Key() string {
-	if n == nil {
-		return ""
+	ss := make([]string, 0, 4)
+	for o, p := n, n.parent; o != nil && p != nil; o, p = p, p.parent {
+		switch p.jsonType {
+		case Object:
+			kn := p.value.([]KeyNode)
+			for i := range kn {
+				if o == &kn[i].Node {
+					ss = append(ss, kn[i].key)
+				}
+			}
+		case Array:
+			nn := p.value.([]Node)
+			for i := range nn {
+				if o == &nn[i] {
+					ss = append(ss, strconv.Itoa(i))
+				}
+			}
+		default:
+			break
+		}
 	}
-	return n.key
+	rr := make([]string, len(ss))
+	for i, s := range ss {
+		rr[len(ss)-i-1] = s
+	}
+	return strings.Join(rr, ".")
 }
 
 // Type returns the JSONType of a node.
@@ -80,7 +107,7 @@ func (n *Node) Value() (interface{}, error) {
 		return n.value, nil
 	case Object:
 		m := make(map[string]interface{}, 2)
-		for _, f := range n.value.([]Node) {
+		for _, f := range n.value.([]KeyNode) {
 			itf, err := f.Value()
 			if err != nil {
 				return nil, err
@@ -159,7 +186,7 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 			buf = append(buf, (postfix + strings.Repeat(prefix, level) + "]")...)
 			return nil
 		case Object:
-			cc := m.value.([]Node)
+			cc := m.value.([]KeyNode)
 			if len(cc) == 0 {
 				buf = append(buf, (strings.Repeat(prefix, level) + "{}")...)
 				return nil
@@ -168,7 +195,7 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 			for _, c := range cc[:len(cc)-1] {
 				buf = append(buf, (strings.Repeat(prefix, level+1) +
 					"\"" + c.key + "\":" + colonSep)...)
-				m, o = c, m
+				m, o = c.Node, m
 				err := inner(level + 1)
 				if err != nil {
 					return err
@@ -178,7 +205,7 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 			}
 			buf = append(buf, (strings.Repeat(prefix, level+1) + "\"" +
 				cc[len(cc)-1].key + "\":" + colonSep)...)
-			m, o = cc[len(cc)-1], m
+			m, o = cc[len(cc)-1].Node, m
 			err := inner(level + 1)
 			if err != nil {
 				return err
@@ -243,28 +270,32 @@ func EqNode(a, b *Node) bool {
 	if a == b {
 		return true
 	}
-	if a == nil || b == nil {
+	if a == nil || b == nil || a.jsonType != b.jsonType {
 		return false
 	}
-	an, aok := a.value.([]Node)
-	bn, bok := b.value.([]Node)
-	if aok && bok && a.jsonType == b.jsonType && len(an) == len(bn) {
-		if a.jsonType == Array {
-			for i := range an {
-				if !EqNode(&an[i], &bn[i]) {
-					return false
-				}
-			}
-			return true
-		} else if a.jsonType == Object {
-			for i := range an {
-				if m, ok := b.GetChild(an[i].key); !ok && !EqNode(&an[i], m) {
-					return false
-				}
-			}
-			return true
+	if a.jsonType == Array {
+		an, bn := a.value.([]Node), b.value.([]Node)
+		if len(an) != len(bn) {
+			return false
 		}
-	} else if a.key == b.key && a.jsonType == b.jsonType && a.value == b.value {
+		for i := range an {
+			if !EqNode(&an[i], &bn[i]) {
+				return false
+			}
+		}
+		return true
+	} else if a.jsonType == Object {
+		an, bn := a.value.([]KeyNode), b.value.([]KeyNode)
+		if len(an) != len(bn) {
+			return false
+		}
+		for i := range an {
+			if m, ok := b.GetChild(an[i].key); !ok && !EqNode(&an[i].Node, m) {
+				return false
+			}
+		}
+		return true
+	} else if a.value == b.value {
 		return true
 	}
 	return false
@@ -282,7 +313,9 @@ func assertNodeType(n *Node) bool {
 	case string:
 		return n.jsonType == String
 	case []Node:
-		return n.jsonType == Array || n.jsonType == Object
+		return n.jsonType == Array
+	case []KeyNode:
+		return n.jsonType == Object
 	default:
 		return false
 	}
@@ -290,7 +323,7 @@ func assertNodeType(n *Node) bool {
 
 // StandaloneNode generates a single json value of str.
 // It panics if str is a compund json expression.
-func StandaloneNode(key, str string) *Node {
+func StandaloneNode(key, str string) *KeyNode {
 	n, err := parse(lex(strings.NewReader(str)))
 	if err != nil {
 		panic(err)
@@ -298,25 +331,29 @@ func StandaloneNode(key, str string) *Node {
 	if cc, ok := n.value.([]Node); ok && len(cc) > 0 {
 		panic("given value must be single!")
 	}
-	n.key = key
-	return n
+	if cc, ok := n.value.([]KeyNode); ok && len(cc) > 0 {
+		panic("given value must be single!")
+	}
+	return &KeyNode{key, *n}
 }
 
 // AddChildren appends nn nodes to the Array or Object n.
 // It panics if n is not of the two mentioned types or if appended values
 // in an object don't have keys.
-func (n *Node) AddChildren(nn ...Node) {
+func (n *Node) AddChildren(nn ...KeyNode) {
 	if n.jsonType == Object {
 		for _, n := range nn {
 			if n.key == "" {
 				panic("empty key for object value")
 			}
 		}
-		n.value = append(n.value.([]Node), nn...)
+		n.value = append(n.value.([]KeyNode), nn...)
 	} else if n.jsonType == Array {
-		n.value = append(n.value.([]Node), nn...)
+		for _, m := range nn {
+			n.value = append(n.value.([]Node), m.Node)
+		}
 	} else {
-		panic(fmt.Errorf("n is not array or object: %s", n.jsonType))
+		panic(errors.Wrapf(ErrNotArrayOrObject, "n is %s", n.jsonType))
 	}
 }
 
@@ -372,19 +409,18 @@ func NewJSONGo(val interface{}) (*Node, error) {
 		}
 		return &Node{jsonType: Array, value: nn}, nil
 	case reflect.Map:
-		nn := []Node(nil)
+		nn := []KeyNode(nil)
 		for _, key := range v.MapKeys() {
 			elem := v.MapIndex(key)
 			n, err := NewJSONGo(elem.Interface())
 			if err != nil {
 				return nil, err
 			}
-			n.key = key.String()
-			nn = append(nn, *n)
+			nn = append(nn, KeyNode{key.String(), *n})
 		}
 		return &Node{jsonType: Object, value: nn}, nil
 	case reflect.Struct:
-		nn := []Node(nil)
+		nn := []KeyNode(nil)
 		t := v.Type()
 		for i := 0; i < v.NumField(); i++ {
 			if r, _ := utf8.DecodeRuneInString(t.Field(i).Name); !unicode.IsUpper(r) {
@@ -396,11 +432,11 @@ func NewJSONGo(val interface{}) (*Node, error) {
 			}
 			elemT := t.Field(i)
 			tags := strings.Split(elemT.Tag.Get("json"), ",")
-			n.key = tags[0]
-			if n.key == "" {
-				n.key = elemT.Name
+			key := tags[0]
+			if key == "" {
+				key = elemT.Name
 			}
-			nn = append(nn, *n)
+			nn = append(nn, KeyNode{key, *n})
 		}
 		return &Node{jsonType: Object, value: nn}, nil
 	case reflect.Ptr:
@@ -420,7 +456,7 @@ func (n *Node) GetChild(name string) (*Node, bool) {
 	}
 	switch n.jsonType {
 	case Object:
-		for _, c := range n.value.([]Node) {
+		for _, c := range n.value.([]KeyNode) {
 			if c.key == keys[0] {
 				return c.GetChild(strings.Join(keys[1:], "."))
 			}
@@ -437,7 +473,7 @@ func (n *Node) GetChild(name string) (*Node, bool) {
 		}
 		return nn[i].GetChild(strings.Join(keys[1:], "."))
 	default:
-		panic(fmt.Errorf("not array or object: %v", n.jsonType))
+		panic(errors.Wrapf(ErrNotArrayOrObject, "is %s", n.jsonType))
 	}
 }
 
@@ -448,7 +484,6 @@ func (n *Node) SetChild(key string, val *Node) error {
 	m, ok := n.GetChild(key)
 	keys := strings.Split(key, ".")
 	if ok {
-		val.key = keys[len(keys)-1]
 		*m = *val
 		return nil
 	}
@@ -466,17 +501,19 @@ func (n *Node) SetChild(key string, val *Node) error {
 			} else if m.jsonType == Object {
 
 			}
-			return fmt.Errorf("not array or object")
+			return ErrNotArrayOrObject
 		}
 	}
-	return fmt.Errorf("not array or object")
+	return ErrNotArrayOrObject
 }
 
 // Len gives the length of an array or items in an object
 func (n *Node) Len() int {
 	switch n.Type() {
-	case Array, Object:
+	case Array:
 		return len(n.value.([]Node))
+	case Object:
+		return len(n.value.([]KeyNode))
 	case Error:
 		return 0
 	default:
@@ -499,27 +536,36 @@ func (n *Node) Total() int {
 }
 
 // RemoveChild removes key from the ast corrctly reducing arrays
-func (n *Node) RemoveChild(key string) {
+func (n *Node) RemoveChild(key string) error {
 	keys := strings.Split(key, ".")
-	if len(keys) == 0 {
-		return
+	if keys[0] == "" {
+		return fmt.Errorf("empty key supplied")
 	}
-	if len(keys) == 1 {
-		nn := n.value.([]Node)
+	if len(keys) > 1 {
+		var ok bool
+		n, ok = n.GetChild(strings.Join(keys[:len(keys)-1], "."))
+		if !ok {
+			return fmt.Errorf("node n does not have child %s", key)
+		}
+	}
+	if n.jsonType == Object {
+		nn := n.value.([]KeyNode)
 		for i, m := range nn {
 			if keys[0] == m.key {
 				nn = append(nn[:i], nn[i+1:]...)
 			}
 		}
-	}
-	m, ok := n.GetChild(strings.Join(keys[:len(keys)-1], "."))
-	if ok {
-		nn := m.value.([]Node)
-		for i, o := range nn {
-			if keys[0] == o.key {
-				nn = append(nn[:i], nn[i+1:]...)
-			}
+		return nil
+	} else if n.jsonType == Array {
+		i, err := strconv.Atoi(keys[0])
+		if err != nil {
+			return fmt.Errorf("not-a-number key in array")
 		}
+		nn := n.value.([]Node)
+		nn = append(nn[:i], nn[i+1:]...)
+		return nil
+	} else {
+		return errors.Wrapf(ErrNotArrayOrObject, "in %s", n.jsonType)
 	}
 }
 
@@ -683,7 +729,7 @@ func json2Go(n *Node, val interface{}, stringify bool) (err error) {
 				}
 			}
 		}()
-		for _, nn := range n.value.([]Node) {
+		for _, nn := range n.value.([]KeyNode) {
 			inner.SetMapIndex(reflect.ValueOf(nn.key), reflect.
 				ValueOf(nn.value).
 				Convert(t.Elem()))

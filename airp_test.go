@@ -153,8 +153,8 @@ func TestParser(t *testing.T) {
 	}{
 		{`{"a": null}`, Node{
 			jsonType: Object,
-			value: []Node{
-				{key: "a", jsonType: Null},
+			value: []KeyNode{
+				{"a", Node{jsonType: Null}},
 			},
 		}},
 		{`[false, -31.2, 5, "ab\"cd"]`, Node{
@@ -168,12 +168,12 @@ func TestParser(t *testing.T) {
 		}},
 		{`{"a": 20, "b": [true, null]}`, Node{
 			jsonType: Object,
-			value: []Node{
-				{key: "a", jsonType: Number, value: 20.},
-				{key: "b", jsonType: Array, value: []Node{
+			value: []KeyNode{
+				{"a", Node{jsonType: Number, value: 20.}},
+				{"b", Node{jsonType: Array, value: []Node{
 					{jsonType: Bool, value: true},
 					{jsonType: Null},
-				}},
+				}}},
 			},
 		}},
 		{`[0]`, Node{
@@ -184,12 +184,12 @@ func TestParser(t *testing.T) {
 		}},
 		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, Node{
 			jsonType: Object,
-			value: []Node{
-				{key: "a", jsonType: Object, value: []Node(nil)},
-				{key: "b", jsonType: Array, value: []Node(nil)},
-				{key: "c", jsonType: Null},
-				{key: "d", jsonType: Number, value: 0.},
-				{key: "e", jsonType: String, value: ""},
+			value: []KeyNode{
+				{"a", Node{jsonType: Object, value: []Node(nil)}},
+				{"b", Node{jsonType: Array, value: []Node(nil)}},
+				{"c", Node{jsonType: Null}},
+				{"d", Node{jsonType: Number, value: 0.}},
+				{"e", Node{jsonType: String, value: ""}},
 			},
 		}},
 	}
@@ -275,7 +275,7 @@ func TestParseErr(t *testing.T) {
 			token:      token{Type: objectCToken, Position: [2]int{0, 31}},
 			before:     token{Type: objectCToken, Position: [2]int{0, 30}},
 			parentType: Array,
-			key:        "index",
+			key:        "index.0",
 		}},
 	}
 	for _, test := range tests {
@@ -291,28 +291,35 @@ func TestParseErr(t *testing.T) {
 }
 
 func TestFile(t *testing.T) {
-	want := &Node{jsonType: Object, value: []Node{
-		{key: "bool", jsonType: Bool, value: true},
-		{key: "obj", jsonType: Object, value: []Node{
-			{key: "v", jsonType: Null, value: nil}}},
-		{key: "values", jsonType: Array, value: []Node{
-			{key: "", jsonType: Object, value: []Node{
-				{key: "a", jsonType: Number, value: 5.},
-				{key: "b", jsonType: String, value: "hi"},
-				{key: "c", jsonType: Number, value: 5.8},
-				{key: "d", jsonType: Null, value: nil},
-				{key: "e", jsonType: Bool, value: true}}},
-			{key: "", jsonType: Object, value: []Node{
-				{key: "a", jsonType: Array, value: []Node{
-					{key: "", jsonType: Number, value: 5.},
-					{key: "", jsonType: Number, value: 6.},
-					{key: "", jsonType: Number, value: 7.},
-					{key: "", jsonType: Number, value: 8.}}},
-				{key: "b", jsonType: String, value: "hi2"},
-				{key: "c", jsonType: Number, value: 5.9},
-				{key: "d", jsonType: Object, value: []Node{
-					{key: "f", jsonType: String, value: "Hello there!"}}},
-				{key: "e", jsonType: Bool, value: false}}}}}}}
+	want := &Node{jsonType: Object, value: []KeyNode{
+		{"bool", Node{jsonType: Bool, value: true}},
+		{"obj", Node{jsonType: Object, value: []KeyNode{
+			{"v", Node{jsonType: Null, value: nil}},
+		}}},
+		{"values", Node{jsonType: Array, value: []Node{
+			{jsonType: Object, value: []KeyNode{
+				{"a", Node{jsonType: Number, value: 5.}},
+				{"b", Node{jsonType: String, value: "hi"}},
+				{"c", Node{jsonType: Number, value: 5.8}},
+				{"d", Node{jsonType: Null, value: nil}},
+				{"e", Node{jsonType: Bool, value: true}},
+			}},
+			{jsonType: Object, value: []KeyNode{
+				{"a", Node{jsonType: Array, value: []Node{
+					{jsonType: Number, value: 5.},
+					{jsonType: Number, value: 6.},
+					{jsonType: Number, value: 7.},
+					{jsonType: Number, value: 8.},
+				}}},
+				{"b", Node{jsonType: String, value: "hi2"}},
+				{"c", Node{jsonType: Number, value: 5.9}},
+				{"d", Node{jsonType: Object, value: []KeyNode{
+					{"f", Node{jsonType: String, value: "Hello there!"}},
+				}}},
+				{"e", Node{jsonType: Bool, value: false}},
+			}},
+		}}},
+	}}
 	data, err := ioutil.ReadFile("testfiles/test.json")
 	if err != nil {
 		t.Fatalf("failed reading golden file 'testfiles/test.json': %v", err)
@@ -355,8 +362,8 @@ func TestASTStringer(t *testing.T) {
 	}{
 		{`{"a":null}`, Node{
 			jsonType: Object,
-			value: []Node{
-				{key: "a", jsonType: Null},
+			value: []KeyNode{
+				{"a", Node{jsonType: Null}},
 			},
 		}},
 		{`[false,-31.2,5,"ab\"cd"]`, Node{
@@ -370,12 +377,12 @@ func TestASTStringer(t *testing.T) {
 		}},
 		{`{"a":20,"b":[true,null]}`, Node{
 			jsonType: Object,
-			value: []Node{
-				{key: "a", jsonType: Number, value: float64(20)},
-				{key: "b", jsonType: Array, value: []Node{
+			value: []KeyNode{
+				{"a", Node{jsonType: Number, value: float64(20)}},
+				{"b", Node{jsonType: Array, value: []Node{
 					{jsonType: Bool, value: true},
 					{jsonType: Null},
-				}},
+				}}},
 			},
 		}},
 	}
@@ -394,8 +401,8 @@ func TestASTStringerDebug(t *testing.T) {
 	}{
 		{`{~!"a":^null~}`, Node{
 			jsonType: Object,
-			value: []Node{
-				{key: "a", jsonType: Null},
+			value: []KeyNode{
+				{"a", Node{jsonType: Null}},
 			},
 		}},
 		{`[~!false,-~!-31.2,-~!5,-~!"ab\"cd"~]`, Node{
@@ -409,12 +416,12 @@ func TestASTStringerDebug(t *testing.T) {
 		}},
 		{`{~!"a":^20,-~!"b":^[~!!true,-~!!null~!]~}`, Node{
 			jsonType: Object,
-			value: []Node{
-				{key: "a", jsonType: Number, value: float64(20)},
-				{key: "b", jsonType: Array, value: []Node{
+			value: []KeyNode{
+				{"a", Node{jsonType: Number, value: float64(20)}},
+				{"b", Node{jsonType: Array, value: []Node{
 					{jsonType: Bool, value: true},
 					{jsonType: Null},
-				}},
+				}}},
 			},
 		}},
 	}

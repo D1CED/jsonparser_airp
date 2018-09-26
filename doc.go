@@ -16,9 +16,9 @@ Some differences between this package and encoding/json:
     - bytes slices will be interpreded as strings instead of as base64
       encoded data
 
-TODO(JMH): make object map and remove key or []struct{key string; Node}
-TODO(JMH): correct escape sequences is strings
+TODO(JMH): correct escape sequences in strings
 TODO(JMH): reimplement lexer and parser
 TODO(JMH): merge with dev_home
+TODO(JMH): override multiple key or error in parser
 */
 package jsonparser_airp // import "github.com/d1ced/jsonparser-airp"

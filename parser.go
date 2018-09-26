@@ -1,7 +1,6 @@
 package jsonparser_airp
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 )
@@ -40,9 +39,12 @@ func parse(ch <-chan token, quit func()) (*Node, error) {
 
 func expektKey(p *parser) (parseFunc, error) {
 	t := <-p.in
-	if p.ast.parent != nil && t.Type == objectCToken {
-		if nn, ok := p.ast.parent.value.([]Node); ok && len(nn) == 1 {
-			p.ast.parent.value = []Node(nil)
+	if p.ast.parent == nil || p.ast.parent.jsonType != Object {
+		panic("invariant violation: expect key while not in object")
+	}
+	if t.Type == objectCToken {
+		if kn, ok := p.ast.parent.value.([]KeyNode); ok && len(kn) == 1 {
+			p.ast.parent.value = []KeyNode(nil)
 			p.ast = p.ast.parent
 			return expektDelim, nil
 		}
@@ -53,7 +55,8 @@ func expektKey(p *parser) (parseFunc, error) {
 	if t.Value != keyRegex.FindString(t.Value) {
 		return nil, newParseError("valid key", p.prev, t, p.ast)
 	}
-	p.ast.key = t.Value
+	pp := p.ast.parent.value.([]KeyNode)
+	pp[len(pp)-1].key = t.Value
 	p.prev, t = t, <-p.in
 	defer func() { p.prev = t }()
 	if t.Type != colonToken {
@@ -106,10 +109,10 @@ func expektValue(p *parser) (parseFunc, error) {
 		return expektValue, nil
 	case objectOToken:
 		p.ast.jsonType = Object
-		nn := make([]Node, 1)
-		nn[0].parent = p.ast
-		p.ast.value = nn
-		p.ast = &nn[0]
+		kn := make([]KeyNode, 1)
+		kn[0].parent = p.ast
+		p.ast.value = kn
+		p.ast = &kn[0].Node
 		return expektKey, nil
 	default:
 		return nil, newParseError("value", p.prev, t, p.ast)
@@ -136,8 +139,8 @@ func expektDelim(p *parser) (parseFunc, error) {
 			return expektValue, nil
 		}
 		if p.ast.parent.jsonType == Object {
-			p.ast.parent.value = append(p.ast.parent.value.([]Node), Node{parent: p.ast.parent})
-			p.ast = &p.ast.parent.value.([]Node)[len(p.ast.parent.value.([]Node))-1]
+			p.ast.parent.value = append(p.ast.parent.value.([]KeyNode), KeyNode{Node: Node{parent: p.ast.parent}})
+			p.ast = &p.ast.parent.value.([]KeyNode)[len(p.ast.parent.value.([]KeyNode))-1].Node
 			return expektKey, nil
 		}
 		return nil, newParseError("no comma", p.prev, t, p.ast)
@@ -159,7 +162,7 @@ func expektDelim(p *parser) (parseFunc, error) {
 			p.ast = p.ast.parent
 			return expektDelim, nil
 		default:
-			return nil, fmt.Errorf("not in array or object: %s", p.ast.parent.jsonType)
+			return nil, newParseError("to be in array or object", p.prev, t, p.ast)
 		}
 	default:
 		return nil, newParseError("delimiter", p.prev, t, p.ast)
