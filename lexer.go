@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strconv"
 	"unicode/utf8"
 )
 
@@ -214,16 +215,29 @@ func numberMode(l *lexer) lexFunc {
 	}
 }
 
-// TODO(JMH): implement according to RFC
 func escape(l *lexer) error {
 	r, _, err := l.reader.ReadRune()
 	if err != nil {
 		return err
 	}
-	l.buf.WriteRune('\\')
-	if r == '"' {
+	switch r {
+	case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+		l.buf.WriteRune('\\')
 		l.buf.WriteRune(r)
 		return nil
+	case 'u':
+		b := make([]byte, 4)
+		n, err := l.reader.Read(b)
+		if err != nil || n != 4 {
+			return fmt.Errorf("malformed escape sequence '\\%s'", string(b))
+		}
+		i, err := strconv.ParseInt(string(b), 16, 32)
+		if err != nil {
+			return fmt.Errorf("malformed escape sequence '\\%s'", string(b))
+		}
+		l.buf.WriteRune(rune(i))
+		return nil
+	default:
+		return fmt.Errorf("malformed escape sequence")
 	}
-	return fmt.Errorf("not implemented")
 }

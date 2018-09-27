@@ -16,7 +16,7 @@ Some differences between this package and encoding/json:
     - bytes slices will be interpreded as strings instead of as base64
       encoded data
 
-TODO(JMH): correct escape sequences in strings
+TODO(JMH): better handle escape sequences
 TODO(JMH): reimplement lexer and parser
 TODO(JMH): merge with dev_home
 */

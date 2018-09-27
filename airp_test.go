@@ -665,3 +665,21 @@ func TestJSON2Go(t *testing.T) {
 		}
 	}
 }
+
+func TestEscape(t *testing.T) {
+	tests := []struct {
+		have string
+		want string
+	}{
+		{`"ab\u0063"`, `"abc"`},
+	}
+	for _, test := range tests {
+		n, err := NewJSON(strings.NewReader(test.have))
+		if err != nil {
+			t.Fatalf("tests setup fail: %s", err)
+		}
+		if n.String() != test.want {
+			t.Error(n.String() + " != " + test.want)
+		}
+	}
+}
