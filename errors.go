@@ -39,8 +39,8 @@ func (e *ParseError) Error() string {
 			e.token.Error(), e.msg, e.before.String())
 	}
 	if e.key == "" {
-		return fmt.Sprintf("%s; expected %s token after %s (in top-level value)",
-			e.token.Error(), e.msg, e.before.String())
+		return fmt.Sprintf("%s; expected %s token after %s (in top-level %s)",
+			e.token.Error(), e.msg, e.before.String(), e.parentType.String())
 	}
 	return fmt.Sprintf("%s; expected %s token after %s (at %s in %s)",
 		e.token.Error(), e.msg, e.before.String(), e.key, e.parentType)

@@ -277,6 +277,12 @@ func TestParseErr(t *testing.T) {
 			parentType: Array,
 			key:        "index.0",
 		}},
+		{`{"a":null,"a":true}`, ParseError{
+			msg:        "unique key",
+			parentType: Object,
+			token:      token{Type: stringToken, Value: "a", Position: [2]int{0, 10}},
+			before:     token{Type: commaToken, Position: [2]int{0, 9}},
+		}},
 	}
 	for _, test := range tests {
 		_, err := parse(lex(strings.NewReader(test.have)))
@@ -286,6 +292,36 @@ func TestParseErr(t *testing.T) {
 		}
 		if *pErr != test.want {
 			t.Errorf("got %v, want %s, for %v", pErr, test.want.Error(), test.have)
+		}
+	}
+}
+
+func TestGetKey(t *testing.T) {
+	tests := []struct {
+		json  string
+		key   string
+		value interface{}
+	}{
+		{`[true]`, "0", true},
+		{`[true, 25]`, "1", 25.},
+		{`{"a":true}`, "a", true},
+		{`{"long":5,"a":true}`, "a", true},
+		{`{"long":5,"a":true}`, "long", 5.},
+	}
+	for _, test := range tests {
+		n, err := NewJSON(strings.NewReader(test.json))
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, ok := n.GetChild(test.key)
+		if !ok {
+			t.Errorf("key %s not found in %s", test.key, test.json)
+		}
+		if v, err := m.Value(); err != nil || v != test.value {
+			t.Errorf("got %v want %v; with err: %v", v, test.value, err)
+		}
+		if k := m.Key(); k != test.key {
+			t.Errorf("got %s want %s", k, test.key)
 		}
 	}
 }
@@ -426,7 +462,9 @@ func TestASTStringerDebug(t *testing.T) {
 		}},
 	}
 	for _, test := range tests {
-		got := test.have.stringDebug()
+		b := &strings.Builder{}
+		test.have.format(b, "!", "~", "-", "^")
+		got := b.String()
 		if got != test.want {
 			t.Errorf("want: %s, got: %s", test.want, got)
 		}

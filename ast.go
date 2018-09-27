@@ -52,25 +52,37 @@ type KeyNode struct {
 
 // Key returns the name of a Node.
 func (n *Node) Key() string {
+	if n == nil {
+		return ""
+	}
 	ss := make([]string, 0, 4)
-	for o, p := n, n.parent; o != nil && p != nil; o, p = p, p.parent {
+outer:
+	for o, p := n, n.parent; p != nil; o, p = p, p.parent {
 		switch p.jsonType {
 		case Object:
 			kn := p.value.([]KeyNode)
 			for i := range kn {
 				if o == &kn[i].Node {
 					ss = append(ss, kn[i].key)
+					continue outer
 				}
+			}
+			if len(kn) != 0 {
+				panic("invariant violation")
 			}
 		case Array:
 			nn := p.value.([]Node)
 			for i := range nn {
 				if o == &nn[i] {
 					ss = append(ss, strconv.Itoa(i))
+					continue outer
 				}
 			}
+			if len(nn) != 0 {
+				panic("invariant violation")
+			}
 		default:
-			break
+			break outer
 		}
 	}
 	rr := make([]string, len(ss))
@@ -234,13 +246,6 @@ func (n *Node) String() string {
 	if err != nil {
 		return ""
 	}
-	return b.String()
-}
-
-// stringDebug formats an ast for inspecting the internals.
-func (n *Node) stringDebug() string {
-	b := &strings.Builder{}
-	n.format(b, "!", "~", "-", "^")
 	return b.String()
 }
 
@@ -456,9 +461,10 @@ func (n *Node) GetChild(name string) (*Node, bool) {
 	}
 	switch n.jsonType {
 	case Object:
-		for _, c := range n.value.([]KeyNode) {
-			if c.key == keys[0] {
-				return c.GetChild(strings.Join(keys[1:], "."))
+		kn := n.value.([]KeyNode)
+		for i := range kn {
+			if kn[i].key == keys[0] {
+				return kn[i].GetChild(strings.Join(keys[1:], "."))
 			}
 		}
 		return nil, false

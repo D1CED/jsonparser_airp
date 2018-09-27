@@ -56,6 +56,11 @@ func expektKey(p *parser) (parseFunc, error) {
 		return nil, newParseError("valid key", p.prev, t, p.ast)
 	}
 	pp := p.ast.parent.value.([]KeyNode)
+	for _, kn := range pp {
+		if kn.key == t.Value {
+			return nil, newParseError("unique key", p.prev, t, p.ast)
+		}
+	}
 	pp[len(pp)-1].key = t.Value
 	p.prev, t = t, <-p.in
 	defer func() { p.prev = t }()
