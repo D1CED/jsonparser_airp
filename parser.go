@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-var keyRegex = regexp.MustCompile(`[[:alpha:]][[:word:]]*`)
+var keyRegex = regexp.MustCompile(`[[:alpha:]][[:word:]:\-]*`)
 
 // parser is a state machine creating an ast from lex tokens
 // the parser is only allowed to cancel it if recieves an error from the lexer
@@ -52,16 +52,16 @@ func expektKey(p *parser) (parseFunc, error) {
 	if t.Type != stringToken {
 		return nil, newParseError("key", p.prev, t, p.ast)
 	}
-	if t.Value != keyRegex.FindString(t.Value) {
+	if t.value != keyRegex.FindString(t.value) {
 		return nil, newParseError("valid key", p.prev, t, p.ast)
 	}
 	pp := p.ast.parent.value.([]KeyNode)
 	for _, kn := range pp {
-		if kn.key == t.Value {
+		if kn.Key == t.value {
 			return nil, newParseError("unique key", p.prev, t, p.ast)
 		}
 	}
-	pp[len(pp)-1].key = t.Value
+	pp[len(pp)-1].Key = t.value
 	p.prev, t = t, <-p.in
 	defer func() { p.prev = t }()
 	if t.Type != colonToken {
@@ -84,7 +84,7 @@ func expektValue(p *parser) (parseFunc, error) {
 	case numberToken:
 		p.ast.jsonType = Number
 		// number check
-		num, err := strconv.ParseFloat(t.Value, 64)
+		num, err := strconv.ParseFloat(t.value, 64)
 		if err != nil {
 			return nil, newParseError("number", p.prev, t, p.ast)
 		}
@@ -92,7 +92,7 @@ func expektValue(p *parser) (parseFunc, error) {
 		return expektDelim, nil
 	case stringToken:
 		p.ast.jsonType = String
-		p.ast.value = t.Value
+		p.ast.value = t.value
 		return expektDelim, nil
 	case nullToken:
 		p.ast.jsonType = Null

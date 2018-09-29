@@ -21,24 +21,24 @@ const (
 
 type token struct {
 	Type     tokenType
-	Value    string
-	Position [2]int
+	value    string
+	position [2]int
 }
 
 func newToken(b rune, r, c int) token {
 	switch b {
 	case '{':
-		return token{Type: objectOToken, Position: [2]int{r, c}}
+		return token{Type: objectOToken, position: [2]int{r, c}}
 	case '}':
-		return token{Type: objectCToken, Position: [2]int{r, c}}
+		return token{Type: objectCToken, position: [2]int{r, c}}
 	case '[':
-		return token{Type: arrayOToken, Position: [2]int{r, c}}
+		return token{Type: arrayOToken, position: [2]int{r, c}}
 	case ']':
-		return token{Type: arrayCToken, Position: [2]int{r, c}}
+		return token{Type: arrayCToken, position: [2]int{r, c}}
 	case ':':
-		return token{Type: colonToken, Position: [2]int{r, c}}
+		return token{Type: colonToken, position: [2]int{r, c}}
 	case ',':
-		return token{Type: commaToken, Position: [2]int{r, c}}
+		return token{Type: commaToken, position: [2]int{r, c}}
 	default:
 		panic("only single byte tokens allowed")
 	}
@@ -54,9 +54,9 @@ func (t token) String() string {
 	case falseToken:
 		return "<false>"
 	case numberToken:
-		return "<num " + t.Value + ">"
+		return "<num " + t.value + ">"
 	case stringToken:
-		return `<str "` + t.Value + `">`
+		return `<str "` + t.value + `">`
 	case commaToken:
 		return "<,>"
 	case colonToken:
@@ -70,16 +70,16 @@ func (t token) String() string {
 	case objectCToken:
 		return "<}>"
 	case errToken:
-		return "<err " + t.Value + ">"
+		return "<err " + t.value + ">"
 	default:
-		return "<unkown " + t.Value + ">"
+		return "<unkown " + t.value + ">"
 	}
 }
 
 // Error implements the error interface for token.
 func (t token) Error() string {
 	if t.Type == errToken {
-		return fmt.Sprintf("%d:%d '%v'", t.Position[0], t.Position[1], t.Value)
+		return fmt.Sprintf("%d:%d '%v'", t.position[0], t.position[1], t.value)
 	}
-	return fmt.Sprintf("%d:%d %v", t.Position[0], t.Position[1], t.String())
+	return fmt.Sprintf("%d:%d %v", t.position[0], t.position[1], t.String())
 }

@@ -18,6 +18,5 @@ Some differences between this package and encoding/json:
 
 TODO(JMH): better handle escape sequences
 TODO(JMH): reimplement lexer and parser
-TODO(JMH): merge with dev_home
 */
 package jsonparser_airp // import "github.com/d1ced/jsonparser_airp"

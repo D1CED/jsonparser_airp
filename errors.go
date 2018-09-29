@@ -48,7 +48,7 @@ func (e *ParseError) Error() string {
 
 // Where returns the row and column where the syntax error in json occured.
 func (e *ParseError) Where() (row, col int) {
-	return e.token.Position[0], e.token.Position[1]
+	return e.token.position[0], e.token.position[1]
 }
 
 // helper functions

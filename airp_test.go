@@ -3,6 +3,7 @@ package jsonparser_airp
 import (
 	"bytes"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -15,84 +16,84 @@ func TestLexer(t *testing.T) {
 		want []token
 	}{
 		{`{"a": null}`, []token{
-			{Type: objectOToken, Position: [2]int{0, 0}},
-			{Type: stringToken, Value: "a", Position: [2]int{0, 1}},
-			{Type: colonToken, Position: [2]int{0, 4}},
-			{Type: nullToken, Position: [2]int{0, 6}},
-			{Type: objectCToken, Position: [2]int{0, 10}},
+			{Type: objectOToken, position: [2]int{0, 0}},
+			{Type: stringToken, value: "a", position: [2]int{0, 1}},
+			{Type: colonToken, position: [2]int{0, 4}},
+			{Type: nullToken, position: [2]int{0, 6}},
+			{Type: objectCToken, position: [2]int{0, 10}},
 		}},
 		{`[false, -31.2, 5, "ab\"cd"]`, []token{
-			{Type: arrayOToken, Position: [2]int{0, 0}},
-			{Type: falseToken, Position: [2]int{0, 1}},
-			{Type: commaToken, Position: [2]int{0, 6}},
-			{Type: numberToken, Value: "-31.2", Position: [2]int{0, 8}},
-			{Type: commaToken, Position: [2]int{0, 13}},
-			{Type: numberToken, Value: "5", Position: [2]int{0, 15}},
-			{Type: commaToken, Position: [2]int{0, 16}},
-			{Type: stringToken, Value: "ab\\\"cd", Position: [2]int{0, 18}},
-			{Type: arrayCToken, Position: [2]int{0, 26}},
+			{Type: arrayOToken, position: [2]int{0, 0}},
+			{Type: falseToken, position: [2]int{0, 1}},
+			{Type: commaToken, position: [2]int{0, 6}},
+			{Type: numberToken, value: "-31.2", position: [2]int{0, 8}},
+			{Type: commaToken, position: [2]int{0, 13}},
+			{Type: numberToken, value: "5", position: [2]int{0, 15}},
+			{Type: commaToken, position: [2]int{0, 16}},
+			{Type: stringToken, value: "ab\\\"cd", position: [2]int{0, 18}},
+			{Type: arrayCToken, position: [2]int{0, 26}},
 		}},
 		{`{"a": 20, "b": [true, null]}`, []token{
-			{Type: objectOToken, Position: [2]int{0, 0}},
-			{Type: stringToken, Value: "a", Position: [2]int{0, 1}},
-			{Type: colonToken, Position: [2]int{0, 4}},
-			{Type: numberToken, Value: "20", Position: [2]int{0, 6}},
-			{Type: commaToken, Position: [2]int{0, 8}},
-			{Type: stringToken, Value: "b", Position: [2]int{0, 10}},
-			{Type: colonToken, Position: [2]int{0, 13}},
-			{Type: arrayOToken, Position: [2]int{0, 15}},
-			{Type: trueToken, Position: [2]int{0, 16}},
-			{Type: commaToken, Position: [2]int{0, 20}},
-			{Type: nullToken, Position: [2]int{0, 22}},
-			{Type: arrayCToken, Position: [2]int{0, 26}},
-			{Type: objectCToken, Position: [2]int{0, 27}},
+			{Type: objectOToken, position: [2]int{0, 0}},
+			{Type: stringToken, value: "a", position: [2]int{0, 1}},
+			{Type: colonToken, position: [2]int{0, 4}},
+			{Type: numberToken, value: "20", position: [2]int{0, 6}},
+			{Type: commaToken, position: [2]int{0, 8}},
+			{Type: stringToken, value: "b", position: [2]int{0, 10}},
+			{Type: colonToken, position: [2]int{0, 13}},
+			{Type: arrayOToken, position: [2]int{0, 15}},
+			{Type: trueToken, position: [2]int{0, 16}},
+			{Type: commaToken, position: [2]int{0, 20}},
+			{Type: nullToken, position: [2]int{0, 22}},
+			{Type: arrayCToken, position: [2]int{0, 26}},
+			{Type: objectCToken, position: [2]int{0, 27}},
 		}},
 		{`[0]`, []token{
-			{Type: arrayOToken, Position: [2]int{0, 0}},
-			{Type: numberToken, Value: "0", Position: [2]int{0, 1}},
-			{Type: arrayCToken, Position: [2]int{0, 2}},
+			{Type: arrayOToken, position: [2]int{0, 0}},
+			{Type: numberToken, value: "0", position: [2]int{0, 1}},
+			{Type: arrayCToken, position: [2]int{0, 2}},
 		}},
 		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, []token{
-			{Type: objectOToken, Position: [2]int{0, 0}},
-			{Type: stringToken, Value: "a", Position: [2]int{0, 1}},
-			{Type: colonToken, Position: [2]int{0, 4}},
-			{Type: objectOToken, Position: [2]int{0, 5}},
-			{Type: objectCToken, Position: [2]int{0, 6}},
-			{Type: commaToken, Position: [2]int{0, 7}},
-			{Type: stringToken, Value: "b", Position: [2]int{0, 8}},
-			{Type: colonToken, Position: [2]int{0, 11}},
-			{Type: arrayOToken, Position: [2]int{0, 12}},
-			{Type: arrayCToken, Position: [2]int{0, 13}},
-			{Type: commaToken, Position: [2]int{0, 14}},
-			{Type: stringToken, Value: "c", Position: [2]int{0, 15}},
-			{Type: colonToken, Position: [2]int{0, 18}},
-			{Type: nullToken, Position: [2]int{0, 19}},
-			{Type: commaToken, Position: [2]int{0, 23}},
-			{Type: stringToken, Value: "d", Position: [2]int{0, 24}},
-			{Type: colonToken, Position: [2]int{0, 27}},
-			{Type: numberToken, Value: "0", Position: [2]int{0, 28}},
-			{Type: commaToken, Position: [2]int{0, 29}},
-			{Type: stringToken, Value: "e", Position: [2]int{0, 30}},
-			{Type: colonToken, Position: [2]int{0, 33}},
-			{Type: stringToken, Position: [2]int{0, 34}},
-			{Type: objectCToken, Position: [2]int{0, 36}},
+			{Type: objectOToken, position: [2]int{0, 0}},
+			{Type: stringToken, value: "a", position: [2]int{0, 1}},
+			{Type: colonToken, position: [2]int{0, 4}},
+			{Type: objectOToken, position: [2]int{0, 5}},
+			{Type: objectCToken, position: [2]int{0, 6}},
+			{Type: commaToken, position: [2]int{0, 7}},
+			{Type: stringToken, value: "b", position: [2]int{0, 8}},
+			{Type: colonToken, position: [2]int{0, 11}},
+			{Type: arrayOToken, position: [2]int{0, 12}},
+			{Type: arrayCToken, position: [2]int{0, 13}},
+			{Type: commaToken, position: [2]int{0, 14}},
+			{Type: stringToken, value: "c", position: [2]int{0, 15}},
+			{Type: colonToken, position: [2]int{0, 18}},
+			{Type: nullToken, position: [2]int{0, 19}},
+			{Type: commaToken, position: [2]int{0, 23}},
+			{Type: stringToken, value: "d", position: [2]int{0, 24}},
+			{Type: colonToken, position: [2]int{0, 27}},
+			{Type: numberToken, value: "0", position: [2]int{0, 28}},
+			{Type: commaToken, position: [2]int{0, 29}},
+			{Type: stringToken, value: "e", position: [2]int{0, 30}},
+			{Type: colonToken, position: [2]int{0, 33}},
+			{Type: stringToken, position: [2]int{0, 34}},
+			{Type: objectCToken, position: [2]int{0, 36}},
 		}},
 		{`{"index":[{"inner":[null,true]}}]`, []token{
-			{Type: objectOToken, Position: [2]int{0, 0}},
-			{Type: stringToken, Value: "index", Position: [2]int{0, 1}},
-			{Type: colonToken, Position: [2]int{0, 8}},
-			{Type: arrayOToken, Position: [2]int{0, 9}},
-			{Type: objectOToken, Position: [2]int{0, 10}},
-			{Type: stringToken, Value: "inner", Position: [2]int{0, 11}},
-			{Type: colonToken, Position: [2]int{0, 18}},
-			{Type: arrayOToken, Position: [2]int{0, 19}},
-			{Type: nullToken, Position: [2]int{0, 20}},
-			{Type: commaToken, Position: [2]int{0, 24}},
-			{Type: trueToken, Position: [2]int{0, 25}},
-			{Type: arrayCToken, Position: [2]int{0, 29}},
-			{Type: objectCToken, Position: [2]int{0, 30}},
-			{Type: objectCToken, Position: [2]int{0, 31}},
-			{Type: arrayCToken, Position: [2]int{0, 32}},
+			{Type: objectOToken, position: [2]int{0, 0}},
+			{Type: stringToken, value: "index", position: [2]int{0, 1}},
+			{Type: colonToken, position: [2]int{0, 8}},
+			{Type: arrayOToken, position: [2]int{0, 9}},
+			{Type: objectOToken, position: [2]int{0, 10}},
+			{Type: stringToken, value: "inner", position: [2]int{0, 11}},
+			{Type: colonToken, position: [2]int{0, 18}},
+			{Type: arrayOToken, position: [2]int{0, 19}},
+			{Type: nullToken, position: [2]int{0, 20}},
+			{Type: commaToken, position: [2]int{0, 24}},
+			{Type: trueToken, position: [2]int{0, 25}},
+			{Type: arrayCToken, position: [2]int{0, 29}},
+			{Type: objectCToken, position: [2]int{0, 30}},
+			{Type: objectCToken, position: [2]int{0, 31}},
+			{Type: arrayCToken, position: [2]int{0, 32}},
 		}},
 	}
 outer:
@@ -118,20 +119,20 @@ func TestLexeErr(t *testing.T) {
 		want token
 	}{
 		{`{"a": nul}`, token{
-			Value:    "nul",
-			Position: [2]int{0, 6},
+			value:    "nul",
+			position: [2]int{0, 6},
 		}},
 		{`{"a": "\"}`, token{
-			Value:    `"\"}`,
-			Position: [2]int{0, 6},
+			value:    `"\"}`,
+			position: [2]int{0, 6},
 		}},
 		{`{"a". false}`, token{
-			Value:    ".",
-			Position: [2]int{0, 4},
+			value:    ".",
+			position: [2]int{0, 4},
 		}},
 		{"{\"a\"\n <garbage>}", token{
-			Value:    "<garbage>",
-			Position: [2]int{1, 1},
+			value:    "<garbage>",
+			position: [2]int{1, 1},
 		}},
 	}
 	for _, test := range tests {
@@ -209,79 +210,79 @@ func TestParseErr(t *testing.T) {
 		{"", ParseError{msg: "value"}},
 		{"null 5", ParseError{
 			msg:    "delimiter",
-			token:  token{Type: numberToken, Value: "5", Position: [2]int{0, 5}},
-			before: token{Type: nullToken, Position: [2]int{0, 0}},
+			token:  token{Type: numberToken, value: "5", position: [2]int{0, 5}},
+			before: token{Type: nullToken, position: [2]int{0, 0}},
 		}},
 		{`{"a": nul}`, ParseError{
 			msg:        "value",
-			token:      token{Value: "nul", Position: [2]int{0, 6}},
-			before:     token{Type: colonToken, Position: [2]int{0, 4}},
+			token:      token{value: "nul", position: [2]int{0, 6}},
+			before:     token{Type: colonToken, position: [2]int{0, 4}},
 			parentType: Object,
 			key:        "a",
 		}},
 		{`{"a": null`, ParseError{
 			msg:        "delimiter",
-			token:      token{Type: nullToken, Position: [2]int{0, 6}},
-			before:     token{Type: nullToken, Position: [2]int{0, 6}},
+			token:      token{Type: nullToken, position: [2]int{0, 6}},
+			before:     token{Type: nullToken, position: [2]int{0, 6}},
 			parentType: Object,
 			key:        "a",
 		}},
 		{`{"b": "\"}`, ParseError{
 			msg:        "value",
-			token:      token{Value: `"\"}`, Position: [2]int{0, 6}},
-			before:     token{Type: colonToken, Position: [2]int{0, 4}},
+			token:      token{value: `"\"}`, position: [2]int{0, 6}},
+			before:     token{Type: colonToken, position: [2]int{0, 4}},
 			parentType: Object,
 			key:        "b",
 		}},
 		{`{"a":[],"b":{"a". false}}`, ParseError{
 			msg:        "colon",
-			token:      token{Value: ".", Position: [2]int{0, 16}},
-			before:     token{Type: stringToken, Value: "a", Position: [2]int{0, 13}},
+			token:      token{value: ".", position: [2]int{0, 16}},
+			before:     token{Type: stringToken, value: "a", position: [2]int{0, 13}},
 			parentType: Object,
 			key:        "b.a",
 		}},
 		{"{\"very_long\"\n <garbage>}", ParseError{
 			msg:        "colon",
-			token:      token{Value: "<garbage>", Position: [2]int{1, 1}},
-			before:     token{Type: stringToken, Value: "very_long", Position: [2]int{0, 1}},
+			token:      token{value: "<garbage>", position: [2]int{1, 1}},
+			before:     token{Type: stringToken, value: "very_long", position: [2]int{0, 1}},
 			parentType: Object,
 			key:        "very_long",
 		}},
 		{"{", ParseError{
 			msg:        "key",
-			before:     token{Type: objectOToken, Position: [2]int{0, 0}},
+			before:     token{Type: objectOToken, position: [2]int{0, 0}},
 			parentType: Object,
 		}},
 		{`[{"b":}]`, ParseError{
 			msg:        "value",
-			token:      token{Type: objectCToken, Position: [2]int{0, 6}},
-			before:     token{Type: colonToken, Position: [2]int{0, 5}},
+			token:      token{Type: objectCToken, position: [2]int{0, 6}},
+			before:     token{Type: colonToken, position: [2]int{0, 5}},
 			parentType: Object,
 			key:        "0.b",
 		}},
 		{`[{"b":true},false,5.2,]`, ParseError{
 			msg:        "value",
-			token:      token{Type: arrayCToken, Position: [2]int{0, 22}},
-			before:     token{Type: commaToken, Position: [2]int{0, 21}},
+			token:      token{Type: arrayCToken, position: [2]int{0, 22}},
+			before:     token{Type: commaToken, position: [2]int{0, 21}},
 			parentType: Array,
 			key:        "3",
 		}},
 		{`abcdefghij`, ParseError{
 			msg:   "value",
-			token: token{Value: "abcdefghij", Position: [2]int{0, 0}},
+			token: token{value: "abcdefghij", position: [2]int{0, 0}},
 		}},
 		{`{"index":[{"inner":[null,true]}}]`, ParseError{
 			msg:        "array closing",
-			token:      token{Type: objectCToken, Position: [2]int{0, 31}},
-			before:     token{Type: objectCToken, Position: [2]int{0, 30}},
+			token:      token{Type: objectCToken, position: [2]int{0, 31}},
+			before:     token{Type: objectCToken, position: [2]int{0, 30}},
 			parentType: Array,
 			key:        "index.0",
 		}},
 		{`{"a":null,"a":true}`, ParseError{
 			msg:        "unique key",
 			parentType: Object,
-			token:      token{Type: stringToken, Value: "a", Position: [2]int{0, 10}},
-			before:     token{Type: commaToken, Position: [2]int{0, 9}},
+			token:      token{Type: stringToken, value: "a", position: [2]int{0, 10}},
+			before:     token{Type: commaToken, position: [2]int{0, 9}},
 		}},
 	}
 	for _, test := range tests {
@@ -309,7 +310,7 @@ func TestGetKey(t *testing.T) {
 		{`{"long":5,"a":true}`, "long", 5.},
 	}
 	for _, test := range tests {
-		n, err := NewJSON(strings.NewReader(test.json))
+		n, err := NewJSONString(test.json)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -363,6 +364,70 @@ func TestFile(t *testing.T) {
 	n, err := parse(lex(bytes.NewReader(data)))
 	if err != nil || !EqNode(want, n) {
 		t.Errorf("test failed with error: %v", err)
+	}
+}
+
+func TestFile2(t *testing.T) {
+	f, err := os.Open("testfiles/json.org_example4.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := NewJSONReader(f)
+	if err != nil {
+		t.Error(err)
+	}
+	if n.Total() != 87 {
+		t.Errorf("want 87, got %d", n.Total())
+	}
+
+	m, ok := n.GetChild("web-app.servlet.1.init-param.mailHost")
+	if !ok || m.value != "mail1" {
+		t.Errorf("%v, %v", ok, m)
+	}
+	if m.Type() != String {
+		t.Errorf("want String, got %s", m.Type())
+	}
+	if m.Key() != "web-app.servlet.1.init-param.mailHost" {
+		t.Errorf(`key mismatch: want "web-app.servlet.1.init-param.mailHost", got %s`, m.Key())
+	}
+
+	m, _ = n.GetChild("web-app.servlet.4.init-param")
+	m.AddChildren(StandaloneNode("new", `"indeed!"`))
+	err = m.RemoveChild("betaServer")
+	if err != nil {
+		t.Error(err)
+	}
+	err = m.SetChild(StandaloneNode("log", "5"))
+	if err != nil {
+		t.Error(err)
+	}
+	err = m.SetChild(StandaloneNode("dataLogMaxSize", "null"))
+	if err != nil {
+		t.Error(err)
+	}
+	want := `
+{
+  "templatePath": "toolstemplates/",
+  "log": 5,
+  "logLocation": "/usr/local/tomcat/logs/CofaxTools.log",
+  "logMaxSize": "",
+  "dataLog": 1,
+  "dataLogLocation": "/usr/local/tomcat/logs/dataLog.log",
+  "dataLogMaxSize": null,
+  "removePageCache": "/content/admin/remove?cache=pages&id=",
+  "removeTemplateCache": "/content/admin/remove?cache=templates&id=",
+  "fileTransferFolder": "/usr/local/tomcat/webapps/content/fileTransferFolder",
+  "lookInContext": 1,
+  "adminGroupID": 4,
+  "new": "indeed!"
+}`
+	if m.Len() != 13 {
+		t.Errorf("want 13, got %d", m.Len())
+	}
+	b := &bytes.Buffer{}
+	m.WriteIndent(b, "  ")
+	if b.String() != strings.TrimSpace(want) {
+		t.Error("string representation mismatch")
 	}
 }
 
@@ -577,7 +642,7 @@ func TestEqNode(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		m, err := NewJSON(strings.NewReader(test.json))
+		m, err := NewJSONString(test.json)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -598,7 +663,7 @@ func TestLen(t *testing.T) {
 		{"[1,2,3,4,5,6,7,8,9]", 9},
 	}
 	for _, test := range tests {
-		n, err := NewJSON(strings.NewReader(test.json))
+		n, err := NewJSONString(test.json)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -674,7 +739,7 @@ func TestEscape(t *testing.T) {
 		{`"ab\u0063"`, `"abc"`},
 	}
 	for _, test := range tests {
-		n, err := NewJSON(strings.NewReader(test.have))
+		n, err := NewJSONString(test.have)
 		if err != nil {
 			t.Fatalf("tests setup fail: %s", err)
 		}
