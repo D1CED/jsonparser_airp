@@ -61,6 +61,9 @@ func expektKey(p *parser) (parseFunc, error) {
 			return nil, newParseError("unique key", p.prev, t, p.ast)
 		}
 	}
+	if pp[len(pp)-1].Node != p.ast {
+		panic("not 'this'")
+	}
 	pp[len(pp)-1].Key = t.value
 	p.prev, t = t, <-p.in
 	defer func() { p.prev = t }()
@@ -74,8 +77,8 @@ func expektValue(p *parser) (parseFunc, error) {
 	t := <-p.in
 	defer func() { p.prev = t }()
 	if p.ast.parent != nil && t.Type == arrayCToken {
-		if nn, ok := p.ast.parent.value.([]Node); ok && len(nn) == 1 {
-			p.ast.parent.value = []Node(nil)
+		if nn, ok := p.ast.parent.value.([]*Node); ok && len(nn) == 1 {
+			p.ast.parent.value = []*Node(nil)
 			p.ast = p.ast.parent
 			return expektDelim, nil
 		}
@@ -107,17 +110,19 @@ func expektValue(p *parser) (parseFunc, error) {
 		return expektDelim, nil
 	case arrayOToken:
 		p.ast.jsonType = Array
-		nn := make([]Node, 1)
+		nn := make([]*Node, 1)
+		nn[0] = new(Node)
 		nn[0].parent = p.ast
 		p.ast.value = nn
-		p.ast = &nn[0]
+		p.ast = nn[0]
 		return expektValue, nil
 	case objectOToken:
 		p.ast.jsonType = Object
 		kn := make([]KeyNode, 1)
+		kn[0].Node = new(Node)
 		kn[0].parent = p.ast
 		p.ast.value = kn
-		p.ast = &kn[0].Node
+		p.ast = kn[0].Node
 		return expektKey, nil
 	default:
 		return nil, newParseError("value", p.prev, t, p.ast)
@@ -139,13 +144,13 @@ func expektDelim(p *parser) (parseFunc, error) {
 			return nil, newParseError("no comma", p.prev, t, p.ast)
 		}
 		if p.ast.parent.jsonType == Array {
-			p.ast.parent.value = append(p.ast.parent.value.([]Node), Node{parent: p.ast.parent})
-			p.ast = &p.ast.parent.value.([]Node)[len(p.ast.parent.value.([]Node))-1]
+			p.ast.parent.value = append(p.ast.parent.value.([]*Node), &Node{parent: p.ast.parent})
+			p.ast = p.ast.parent.value.([]*Node)[len(p.ast.parent.value.([]*Node))-1]
 			return expektValue, nil
 		}
 		if p.ast.parent.jsonType == Object {
-			p.ast.parent.value = append(p.ast.parent.value.([]KeyNode), KeyNode{Node: Node{parent: p.ast.parent}})
-			p.ast = &p.ast.parent.value.([]KeyNode)[len(p.ast.parent.value.([]KeyNode))-1].Node
+			p.ast.parent.value = append(p.ast.parent.value.([]KeyNode), KeyNode{Node: &Node{parent: p.ast.parent}})
+			p.ast = p.ast.parent.value.([]KeyNode)[len(p.ast.parent.value.([]KeyNode))-1].Node
 			return expektKey, nil
 		}
 		return nil, newParseError("no comma", p.prev, t, p.ast)

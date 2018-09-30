@@ -37,7 +37,7 @@ const (
 //     Bool     bool
 //     Number   float64
 //     String   string
-//     Array    []Node
+//     Array    []*Node
 //     Object   []KeyNode
 type Node struct {
 	jsonType JSONType
@@ -47,7 +47,7 @@ type Node struct {
 
 type KeyNode struct {
 	Key string
-	Node
+	*Node
 }
 
 // EqNode compares the nodes and all their children. Object keys order is
@@ -60,12 +60,12 @@ func EqNode(a, b *Node) bool {
 		return false
 	}
 	if a.jsonType == Array {
-		an, bn := a.value.([]Node), b.value.([]Node)
+		an, bn := a.value.([]*Node), b.value.([]*Node)
 		if len(an) != len(bn) {
 			return false
 		}
 		for i := range an {
-			if !EqNode(&an[i], &bn[i]) {
+			if !EqNode(an[i], bn[i]) {
 				return false
 			}
 		}
@@ -76,7 +76,7 @@ func EqNode(a, b *Node) bool {
 			return false
 		}
 		for i := range an {
-			if m, ok := b.GetChild(an[i].Key); !ok && !EqNode(&an[i].Node, m) {
+			if m, ok := b.GetChild(an[i].Key); !ok && !EqNode(an[i].Node, m) {
 				return false
 			}
 		}
@@ -85,28 +85,6 @@ func EqNode(a, b *Node) bool {
 		return true
 	}
 	return false
-}
-
-func isValid(n *Node) bool {
-	if n == nil {
-		return false
-	}
-	switch n.value.(type) {
-	case nil:
-		return n.jsonType == Null || n.jsonType == Error
-	case bool:
-		return n.jsonType == Bool
-	case float64:
-		return n.jsonType == Number
-	case string:
-		return n.jsonType == String
-	case []Node:
-		return n.jsonType == Array
-	case []KeyNode:
-		return n.jsonType == Object
-	default:
-		return false
-	}
 }
 
 // NewJSON reads from b and generates an AST
@@ -126,7 +104,7 @@ func NewJSONString(s string) (*Node, error) {
 
 // NewJSONGo reads in a Go-value and generates a json ast that can be
 // manipulated easily.
-// TODO(JMH): add full support for struct-tag options and case insensitive match
+// TODO(JMH): add support for struct-tag options string and omitempty
 func NewJSONGo(val interface{}) (*Node, error) {
 	if val == nil {
 		return &Node{jsonType: Null}, nil
@@ -149,15 +127,19 @@ func NewJSONGo(val interface{}) (*Node, error) {
 		}
 		fallthrough
 	case reflect.Array:
-		nn := []Node(nil)
+		nn := []*Node(nil)
 		for i := 0; i < v.Len(); i++ {
 			n, err := NewJSONGo(v.Index(i).Interface())
 			if err != nil {
 				return nil, err
 			}
-			nn = append(nn, *n)
+			nn = append(nn, n)
 		}
-		return &Node{jsonType: Array, value: nn}, nil
+		o := &Node{jsonType: Array, value: nn}
+		for _, m := range nn {
+			m.parent = o
+		}
+		return o, nil
 	case reflect.Map:
 		nn := []KeyNode(nil)
 		for _, key := range v.MapKeys() {
@@ -166,9 +148,13 @@ func NewJSONGo(val interface{}) (*Node, error) {
 			if err != nil {
 				return nil, err
 			}
-			nn = append(nn, KeyNode{key.String(), *n})
+			nn = append(nn, KeyNode{key.String(), n})
 		}
-		return &Node{jsonType: Object, value: nn}, nil
+		o := &Node{jsonType: Object, value: nn}
+		for _, m := range nn {
+			m.parent = o
+		}
+		return o, nil
 	case reflect.Struct:
 		nn := []KeyNode(nil)
 		t := v.Type()
@@ -186,9 +172,13 @@ func NewJSONGo(val interface{}) (*Node, error) {
 			if key == "" {
 				key = elemT.Name
 			}
-			nn = append(nn, KeyNode{key, *n})
+			nn = append(nn, KeyNode{key, n})
 		}
-		return &Node{jsonType: Object, value: nn}, nil
+		o := &Node{jsonType: Object, value: nn}
+		for _, m := range nn {
+			m.parent = o
+		}
+		return o, nil
 	case reflect.Ptr:
 		return NewJSONGo(v.Elem().Interface())
 	default:
@@ -203,13 +193,13 @@ func StandaloneNode(key, str string) KeyNode {
 	if err != nil {
 		panic(err)
 	}
-	if cc, ok := n.value.([]Node); ok && len(cc) > 0 {
+	if cc, ok := n.value.([]*Node); ok && len(cc) > 0 {
 		panic("given value must be single!")
 	}
 	if cc, ok := n.value.([]KeyNode); ok && len(cc) > 0 {
 		panic("given value must be single!")
 	}
-	return KeyNode{key, *n}
+	return KeyNode{key, n}
 }
 
 // Type returns the JSONType of a node.
@@ -232,25 +222,24 @@ outer:
 		case Object:
 			kn := p.value.([]KeyNode)
 			for i := range kn {
-				if o == &kn[i].Node {
+				if o == kn[i].Node {
 					ss = append(ss, kn[i].Key)
 					continue outer
 				}
 			}
 			if len(kn) != 0 {
-				panic("invariant violation")
+				panic(fmt.Errorf("invariant violation: %s", maxParent(o)))
 			}
 		case Array:
-			nn := p.value.([]Node)
+			nn := p.value.([]*Node)
 			for i := range nn {
-				if o == &nn[i] {
+				if o == nn[i] {
 					ss = append(ss, strconv.Itoa(i))
 					continue outer
 				}
 			}
 			if len(nn) != 0 {
-				fmt.Printf("%p %p %p\n", o, &p.value.([]Node)[1], &nn[1])
-				panic("invariant violation")
+				panic(fmt.Errorf("invariant violation: %s", maxParent(o)))
 			}
 		default:
 			break outer
@@ -292,7 +281,7 @@ func (n *Node) Value() (interface{}, error) {
 		return m, nil
 	case Array:
 		s := make([]interface{}, 0, 2)
-		for _, f := range n.value.([]Node) {
+		for _, f := range n.value.([]*Node) {
 			itf, err := f.Value()
 			if err != nil {
 				return nil, err
@@ -364,7 +353,7 @@ func (n *Node) AddChildren(nn ...KeyNode) {
 		n.value = append(n.value.([]KeyNode), nn...)
 	} else if n.jsonType == Array {
 		for _, m := range nn {
-			n.value = append(n.value.([]Node), m.Node)
+			n.value = append(n.value.([]*Node), m.Node)
 		}
 	} else {
 		panic(errors.Wrapf(ErrNotArrayOrObject, "n is %s", n.jsonType))
@@ -372,8 +361,7 @@ func (n *Node) AddChildren(nn ...KeyNode) {
 }
 
 // GetChild returns the node specifiend by name.
-// GetChild panics if n is not of type array or object, but
-// the key "" always returns the node itself.
+// The key "" always returns the node itself.
 func (n *Node) GetChild(name string) (*Node, bool) {
 	keys := strings.Split(name, ".")
 	if len(keys) == 1 && keys[0] == "" {
@@ -393,13 +381,14 @@ func (n *Node) GetChild(name string) (*Node, bool) {
 		if err != nil {
 			return nil, false
 		}
-		nn := n.value.([]Node)
+		nn := n.value.([]*Node)
 		if len(nn) < i {
 			return nil, false
 		}
 		return nn[i].GetChild(strings.Join(keys[1:], "."))
 	default:
-		panic(errors.Wrapf(ErrNotArrayOrObject, "is %s", n.jsonType))
+		return nil, false
+		//panic(errors.Wrapf(ErrNotArrayOrObject, "is %s", n.jsonType))
 	}
 }
 
@@ -408,28 +397,31 @@ func (n *Node) GetChild(name string) (*Node, bool) {
 // SetChild panics a to extended object is not array or object.
 func (n *Node) SetChild(kn KeyNode) error {
 	m, ok := n.GetChild(kn.Key)
-	keys := strings.Split(kn.Key, ".")
+	_ = strings.Split(kn.Key, ".")
 	if ok {
-		*m = kn.Node
+		m.jsonType = kn.Node.jsonType
+		m.value = kn.Node.value
 		return nil
 	}
-	if len(keys) > 1 {
-		m, ok = n.GetChild(keys[len(keys)-2])
-		if ok {
-			if m.jsonType == Array {
-				idx, err := strconv.Atoi(keys[len(keys)-1])
-				if err != nil {
-					return err
-				}
-				if m.Len() < idx+1 {
-					return fmt.Errorf("too short")
-				}
-			} else if m.jsonType == Object {
+	/*
+		if len(keys) > 1 {
+			m, ok = n.GetChild(keys[len(keys)-2])
+			if ok {
+				if m.jsonType == Array {
+					idx, err := strconv.Atoi(keys[len(keys)-1])
+					if err != nil {
+						return err
+					}
+					if m.Len() < idx+1 {
+						return fmt.Errorf("too short")
+					}
+				} else if m.jsonType == Object {
 
+				}
+				return ErrNotArrayOrObject
 			}
-			return ErrNotArrayOrObject
 		}
-	}
+	*/
 	return ErrNotArrayOrObject
 }
 
@@ -450,6 +442,7 @@ func (n *Node) RemoveChild(key string) error {
 		nn := n.value.([]KeyNode)
 		for i, m := range nn {
 			if keys[0] == m.Key {
+				m.parent = nil
 				n.value = append(nn[:i], nn[i+1:]...)
 				return nil
 			}
@@ -460,10 +453,11 @@ func (n *Node) RemoveChild(key string) error {
 		if err != nil {
 			return fmt.Errorf("not-a-number key in array")
 		}
-		nn := n.value.([]Node)
+		nn := n.value.([]*Node)
 		if i >= len(nn) {
 			return fmt.Errorf("index out of range")
 		}
+		nn[i].parent = nil
 		n.value = append(nn[:i], nn[i+1:]...)
 		return nil
 	} else {
@@ -484,7 +478,7 @@ func (n *Node) GetChildrenKeys() []string {
 		}
 		return ss
 	case Array:
-		nn := n.value.([]Node)
+		nn := n.value.([]*Node)
 		ss := make([]string, len(nn))
 		for i := range nn {
 			ss[i] = strconv.Itoa(i)
@@ -495,13 +489,14 @@ func (n *Node) GetChildrenKeys() []string {
 	}
 }
 
+// TODO(JMH): implement
 func (n *Node) Copy() *Node { return nil }
 
 // Len gives the length of an array or items in an object
 func (n *Node) Len() int {
 	switch n.Type() {
 	case Array:
-		return len(n.value.([]Node))
+		return len(n.value.([]*Node))
 	case Object:
 		return len(n.value.([]KeyNode))
 	case Error:
@@ -516,7 +511,7 @@ func (n *Node) Total() int {
 	switch n.Type() {
 	case Array:
 		i := 0
-		for _, eml := range n.value.([]Node) {
+		for _, eml := range n.value.([]*Node) {
 			i += eml.Total()
 		}
 		return i + 1
@@ -539,10 +534,10 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 		return 0, fmt.Errorf("<nil>")
 	}
 	var inner func(int) error
-	var m, o = *n, Node{}
+	var m, o = n, &Node{}
 	buf := make([]byte, 0, 64)
 	inner = func(level int) error { // closure with single buffer
-		if !isValid(&m) {
+		if !isValid(m) {
 			return fmt.Errorf("format; assertion failure")
 		}
 		switch m.jsonType {
@@ -563,7 +558,7 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 			buf = append(buf, (`"` + m.value.(string) + `"`)...)
 			return nil
 		case Array:
-			cc := m.value.([]Node)
+			cc := m.value.([]*Node)
 			if len(cc) == 0 {
 				buf = append(buf, (strings.Repeat(prefix, level) + "[]")...)
 				return nil
@@ -630,6 +625,7 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 	return w.Write(buf)
 }
 
+// TODO(JMH): add case insensitive match on struct tags
 func json2Go(n *Node, val interface{}, stringify bool) (err error) {
 	v := reflect.ValueOf(val)
 	if v.Kind() != reflect.Ptr {
@@ -683,7 +679,7 @@ func json2Go(n *Node, val interface{}, stringify bool) (err error) {
 			return fmt.Errorf("mismatched type: want Array got %s", n.jsonType)
 		}
 		t := inner.Type().Elem() // interface{}
-		nn := n.value.([]Node)
+		nn := n.value.([]*Node)
 		defer func() {
 			if e := recover(); e != nil {
 				switch val := e.(type) {
@@ -769,4 +765,63 @@ func json2Go(n *Node, val interface{}, stringify bool) (err error) {
 	default:
 		return fmt.Errorf("invalid type supplied")
 	}
+}
+
+func isValid(n *Node) bool {
+	if n == nil {
+		return false
+	}
+	switch n.value.(type) {
+	case nil:
+		return n.jsonType == Null || n.jsonType == Error
+	case bool:
+		return n.jsonType == Bool
+	case float64:
+		return n.jsonType == Number
+	case string:
+		return n.jsonType == String
+	case []*Node:
+		return n.jsonType == Array
+	case []KeyNode:
+		return n.jsonType == Object
+	default:
+		return false
+	}
+}
+
+func cyclicTest(n *Node) bool {
+	if n.parent == nil {
+		return true
+	}
+	switch n.parent.jsonType {
+	case Array:
+		nn := n.parent.value.([]*Node)
+		for i := range nn {
+			if nn[i] == n {
+				return true
+			}
+		}
+		return false
+	case Object:
+		kn := n.parent.value.([]KeyNode)
+		for i := range kn {
+			if kn[i].Node == n {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
+}
+
+// -> Root
+func maxParent(n *Node) *Node {
+	if n == nil || n.parent == nil {
+		return nil
+	}
+	m := n.parent
+	for ; m.parent != nil; m = m.parent {
+	}
+	return m
 }

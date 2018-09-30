@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/andreyvit/diff"
 )
 
 func TestLexer(t *testing.T) {
@@ -155,12 +157,12 @@ func TestParser(t *testing.T) {
 		{`{"a": null}`, Node{
 			jsonType: Object,
 			value: []KeyNode{
-				{"a", Node{jsonType: Null}},
+				{"a", &Node{jsonType: Null}},
 			},
 		}},
 		{`[false, -31.2, 5, "ab\"cd"]`, Node{
 			jsonType: Array,
-			value: []Node{
+			value: []*Node{
 				{jsonType: Bool, value: false},
 				{jsonType: Number, value: -31.2},
 				{jsonType: Number, value: 5.},
@@ -170,8 +172,8 @@ func TestParser(t *testing.T) {
 		{`{"a": 20, "b": [true, null]}`, Node{
 			jsonType: Object,
 			value: []KeyNode{
-				{"a", Node{jsonType: Number, value: 20.}},
-				{"b", Node{jsonType: Array, value: []Node{
+				{"a", &Node{jsonType: Number, value: 20.}},
+				{"b", &Node{jsonType: Array, value: []*Node{
 					{jsonType: Bool, value: true},
 					{jsonType: Null},
 				}}},
@@ -179,18 +181,18 @@ func TestParser(t *testing.T) {
 		}},
 		{`[0]`, Node{
 			jsonType: Array,
-			value: []Node{
+			value: []*Node{
 				{jsonType: Number, value: 0.},
 			},
 		}},
 		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, Node{
 			jsonType: Object,
 			value: []KeyNode{
-				{"a", Node{jsonType: Object, value: []Node(nil)}},
-				{"b", Node{jsonType: Array, value: []Node(nil)}},
-				{"c", Node{jsonType: Null}},
-				{"d", Node{jsonType: Number, value: 0.}},
-				{"e", Node{jsonType: String, value: ""}},
+				{"a", &Node{jsonType: Object, value: []*Node(nil)}},
+				{"b", &Node{jsonType: Array, value: []*Node(nil)}},
+				{"c", &Node{jsonType: Null}},
+				{"d", &Node{jsonType: Number, value: 0.}},
+				{"e", &Node{jsonType: String, value: ""}},
 			},
 		}},
 	}
@@ -308,8 +310,23 @@ func TestGetKey(t *testing.T) {
 		{`{"a":true}`, "a", true},
 		{`{"long":5,"a":true}`, "a", true},
 		{`{"long":5,"a":true}`, "long", 5.},
+		{`[{"long":5,"a":true},{"hi":"yes"}]`, "1.hi", "yes"},
+		{`{"long":[5,null],"a":true}`, "a", true},
+		{`[[[["inner"]]]]`, "0.0.0.0", "inner"},
+		{`[[null,[null,null,["inner"]]]]`, "0.1.2.0", "inner"},
+		{`{"a":{"a":{"a":{"a":"inner"}}}}`, "a.a.a.a", "inner"},
+		{`{"a":{"a":null,"b":{"a":null,"b":null,"c":{"a":"inner"}}}}`, "a.b.c.a", "inner"},
+		{`{"a":[5]}`, "a.0", 5.},
+		{`[{"a":5}]`, "0.a", 5.},
+		{`{"a":[5,"hi"]}`, "a.1", "hi"},
+		{`[[1],null]`, "0.0", 1.}, // MWE
+		{`[null,[1],null]`, "1.0", 1.},
+		{`{"a":{"c":5},"b":"hi"}`, "a.c", 5.},
+		{`{"a":[5],"b":"hi"}`, "a.0", 5.},
+		{`{"long":[5,null],"a":true}`, "long.1", nil},
+		{`{"go":[{"long":[5,null],"a":true}]}`, "go.0.long.1", nil},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		n, err := NewJSONString(test.json)
 		if err != nil {
 			t.Fatal(err)
@@ -324,36 +341,100 @@ func TestGetKey(t *testing.T) {
 		if k := m.Key(); k != test.key {
 			t.Errorf("got %s want %s", k, test.key)
 		}
+		t.Run("memloc", func(t *testing.T) {
+			if testing.Short() {
+				t.Skip("skip memloc in short test")
+			}
+			if o, _ := n.GetChild(test.key); m != o {
+				t.Errorf("expected same memmory location: second time")
+			}
+			if keys := strings.Split(test.key, "."); len(keys) > 1 {
+				parKey := strings.Join(keys[:len(keys)-1], ".")
+				par, _ := n.GetChild(parKey)
+				if !EqNode(par, m.parent) {
+					t.Fatalf("expected same values: %s %s", par, m.parent)
+				}
+				if par != m.parent {
+					t.Errorf("expected same memmory location: parent")
+				}
+			}
+			if maxParent(m) != n {
+				t.Errorf("xx1xx")
+			}
+		})
+		t.Run("debug", func(t *testing.T) {
+			if i != 14 {
+				t.Skip("only test testcase 14")
+			}
+
+			if !cyclicTest(m.parent) {
+				t.Error("non-cyclic upper")
+			}
+			if !cyclicTest(m) {
+				t.Error("non-cyclic lowe")
+			}
+
+			if !EqNode(n, maxParent(m)) {
+				t.Errorf("upper %s == %s\n", n, maxParent(m))
+			}
+			if n != maxParent(m) {
+				t.Errorf("upper %p == %p\n", n, maxParent(m))
+			}
+			if !EqNode(m, n.value.([]*Node)[0].value.([]*Node)[0]) {
+				t.Errorf("lower %s == %s\n", m, n.value.([]*Node)[0].value.([]*Node)[0])
+			}
+			if m != n.value.([]*Node)[0].value.([]*Node)[0] {
+				t.Errorf("lower %p == %p\n", m, n.value.([]*Node)[0].value.([]*Node)[0])
+			}
+
+			if testing.Verbose() {
+				n.SetChild(StandaloneNode("0.0", "2"))
+				t.Logf("%s %s %s\n", n, maxParent(m), m)
+				m.value = 3.
+				t.Logf("%s, %s %s\n", n, maxParent(m), m)
+				t.Log(n, n.value.([]*Node)[0].parent, m.parent.parent)
+				t.Log("--")
+				t.Logf("n-addr %p; n-child %p\n", n, n.value.([]*Node)[0])
+				t.Logf("m-addr %p; m-parent %p\n", m, m.parent)
+				t.Logf("1-n %p; 1-m %p\n", n.value.([]*Node)[0].parent, n.value.([]*Node)[0].value.([]*Node)[0])
+				t.Logf("2-n %p; 2-m %p\n", m.parent.parent, m.parent.value.([]*Node)[0])
+				t.Log("--")
+				x, y, z := n, n.value.([]*Node)[0].parent, m.parent.parent
+				t.Logf("%p %p %p\n", x.value.([]*Node)[0], y.value.([]*Node)[0], z.value.([]*Node)[0])
+
+				m.value = 1.
+			}
+		})
 	}
 }
 
 func TestFile(t *testing.T) {
 	want := &Node{jsonType: Object, value: []KeyNode{
-		{"bool", Node{jsonType: Bool, value: true}},
-		{"obj", Node{jsonType: Object, value: []KeyNode{
-			{"v", Node{jsonType: Null, value: nil}},
+		{"bool", &Node{jsonType: Bool, value: true}},
+		{"obj", &Node{jsonType: Object, value: []KeyNode{
+			{"v", &Node{jsonType: Null, value: nil}},
 		}}},
-		{"values", Node{jsonType: Array, value: []Node{
+		{"values", &Node{jsonType: Array, value: []*Node{
 			{jsonType: Object, value: []KeyNode{
-				{"a", Node{jsonType: Number, value: 5.}},
-				{"b", Node{jsonType: String, value: "hi"}},
-				{"c", Node{jsonType: Number, value: 5.8}},
-				{"d", Node{jsonType: Null, value: nil}},
-				{"e", Node{jsonType: Bool, value: true}},
+				{"a", &Node{jsonType: Number, value: 5.}},
+				{"b", &Node{jsonType: String, value: "hi"}},
+				{"c", &Node{jsonType: Number, value: 5.8}},
+				{"d", &Node{jsonType: Null, value: nil}},
+				{"e", &Node{jsonType: Bool, value: true}},
 			}},
 			{jsonType: Object, value: []KeyNode{
-				{"a", Node{jsonType: Array, value: []Node{
+				{"a", &Node{jsonType: Array, value: []*Node{
 					{jsonType: Number, value: 5.},
 					{jsonType: Number, value: 6.},
 					{jsonType: Number, value: 7.},
 					{jsonType: Number, value: 8.},
 				}}},
-				{"b", Node{jsonType: String, value: "hi2"}},
-				{"c", Node{jsonType: Number, value: 5.9}},
-				{"d", Node{jsonType: Object, value: []KeyNode{
-					{"f", Node{jsonType: String, value: "Hello there!"}},
+				{"b", &Node{jsonType: String, value: "hi2"}},
+				{"c", &Node{jsonType: Number, value: 5.9}},
+				{"d", &Node{jsonType: Object, value: []KeyNode{
+					{"f", &Node{jsonType: String, value: "Hello there!"}},
 				}}},
-				{"e", Node{jsonType: Bool, value: false}},
+				{"e", &Node{jsonType: Bool, value: false}},
 			}},
 		}}},
 	}}
@@ -372,6 +453,7 @@ func TestFile2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
 	n, err := NewJSONReader(f)
 	if err != nil {
 		t.Error(err)
@@ -388,7 +470,8 @@ func TestFile2(t *testing.T) {
 		t.Errorf("want String, got %s", m.Type())
 	}
 	if m.Key() != "web-app.servlet.1.init-param.mailHost" {
-		t.Errorf(`key mismatch: want "web-app.servlet.1.init-param.mailHost", got %s`, m.Key())
+		t.Errorf(`key mismatch: want "web-app.servlet.1.init-param.mailHost", got %s`,
+			m.Key())
 	}
 
 	m, _ = n.GetChild("web-app.servlet.4.init-param")
@@ -427,7 +510,8 @@ func TestFile2(t *testing.T) {
 	b := &bytes.Buffer{}
 	m.WriteIndent(b, "  ")
 	if b.String() != strings.TrimSpace(want) {
-		t.Error("string representation mismatch")
+		t.Errorf("string representation mismatch: \n%s",
+			diff.LineDiff(b.String(), strings.TrimSpace(want)))
 	}
 }
 
@@ -464,12 +548,12 @@ func TestASTStringer(t *testing.T) {
 		{`{"a":null}`, Node{
 			jsonType: Object,
 			value: []KeyNode{
-				{"a", Node{jsonType: Null}},
+				{"a", &Node{jsonType: Null}},
 			},
 		}},
 		{`[false,-31.2,5,"ab\"cd"]`, Node{
 			jsonType: Array,
-			value: []Node{
+			value: []*Node{
 				{jsonType: Bool, value: false},
 				{jsonType: Number, value: -31.2},
 				{jsonType: Number, value: float64(5)},
@@ -479,8 +563,8 @@ func TestASTStringer(t *testing.T) {
 		{`{"a":20,"b":[true,null]}`, Node{
 			jsonType: Object,
 			value: []KeyNode{
-				{"a", Node{jsonType: Number, value: float64(20)}},
-				{"b", Node{jsonType: Array, value: []Node{
+				{"a", &Node{jsonType: Number, value: float64(20)}},
+				{"b", &Node{jsonType: Array, value: []*Node{
 					{jsonType: Bool, value: true},
 					{jsonType: Null},
 				}}},
@@ -503,12 +587,12 @@ func TestASTStringerDebug(t *testing.T) {
 		{`{~!"a":^null~}`, Node{
 			jsonType: Object,
 			value: []KeyNode{
-				{"a", Node{jsonType: Null}},
+				{"a", &Node{jsonType: Null}},
 			},
 		}},
 		{`[~!false,-~!-31.2,-~!5,-~!"ab\"cd"~]`, Node{
 			jsonType: Array,
-			value: []Node{
+			value: []*Node{
 				{jsonType: Bool, value: false},
 				{jsonType: Number, value: -31.2},
 				{jsonType: Number, value: float64(5)},
@@ -518,8 +602,8 @@ func TestASTStringerDebug(t *testing.T) {
 		{`{~!"a":^20,-~!"b":^[~!!true,-~!!null~!]~}`, Node{
 			jsonType: Object,
 			value: []KeyNode{
-				{"a", Node{jsonType: Number, value: float64(20)}},
-				{"b", Node{jsonType: Array, value: []Node{
+				{"a", &Node{jsonType: Number, value: float64(20)}},
+				{"b", &Node{jsonType: Array, value: []*Node{
 					{jsonType: Bool, value: true},
 					{jsonType: Null},
 				}}},
@@ -732,19 +816,18 @@ func TestJSON2Go(t *testing.T) {
 }
 
 func TestEscape(t *testing.T) {
-	tests := []struct {
-		have string
-		want string
-	}{
-		{`"ab\u0063"`, `"abc"`},
+	tests := []struct{ name, have, want string }{
+		{"c", `"ab\u0063"`, `"abc"`},
 	}
 	for _, test := range tests {
-		n, err := NewJSONString(test.have)
-		if err != nil {
-			t.Fatalf("tests setup fail: %s", err)
-		}
-		if n.String() != test.want {
-			t.Error(n.String() + " != " + test.want)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			n, err := NewJSONString(test.have)
+			if err != nil {
+				t.Fatalf("tests setup fail: %s", err)
+			}
+			if n.String() != test.want {
+				t.Error(n.String() + " != " + test.want)
+			}
+		})
 	}
 }
