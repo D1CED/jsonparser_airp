@@ -188,7 +188,7 @@ func TestParser(t *testing.T) {
 		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, Node{
 			jsonType: Object,
 			value: []KeyNode{
-				{"a", &Node{jsonType: Object, value: []*Node(nil)}},
+				{"a", &Node{jsonType: Object, value: []KeyNode(nil)}},
 				{"b", &Node{jsonType: Array, value: []*Node(nil)}},
 				{"c", &Node{jsonType: Null}},
 				{"d", &Node{jsonType: Number, value: 0.}},
@@ -641,6 +641,7 @@ func TestNewJSONGo(t *testing.T) {
 	type myType int
 	var intPtr = new(int)
 	*intPtr = 50
+
 	tests := []struct {
 		have interface{}
 		want string
@@ -659,9 +660,29 @@ func TestNewJSONGo(t *testing.T) {
 			a       string
 		}{20, "aa"}, `{"Integer":20}`},
 		{struct {
-			Integer int `json:"int"`
+			Integer uint `json:"int"`
 			a       string
 		}{20, "aa"}, `{"int":20}`},
+		{struct {
+			Integer int `json:"-"`
+			A       string
+		}{20, "aa"}, `{"A":"aa"}`},
+		{struct {
+			Integer int    `json:",omitempty"`
+			A       string `json:"omitempty"`
+		}{0, "aa"}, `{"omitempty":"aa"}`},
+		{struct {
+			Integer int    `json:",omitempty"`
+			A       string `json:"omitempty"`
+		}{1, "aa"}, `{"Integer":1,"omitempty":"aa"}`},
+		{struct {
+			Integer int    `json:",omitempty,string"`
+			A       string `json:"a-b,"`
+		}{1, "aa"}, `{"Integer":"1","a-b":"aa"}`},
+		{struct {
+			Integer int64  `json:",string"`
+			A       string `json:"string"`
+		}{0, "aa"}, `{"Integer":"0","string":"aa"}`},
 		{&struct {
 			Integer *int `json:"intptr"`
 			a       string
@@ -720,6 +741,7 @@ func TestEqNode(t *testing.T) {
 			"a":    true,
 			"long": 100000,
 		}, `{"long":100000,"a":true}`},
+		{[]interface{}{"hello", false}, `["hello",false]`},
 	}
 	for _, test := range tests {
 		n, err := NewJSONGo(test.goval)
@@ -731,7 +753,7 @@ func TestEqNode(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !EqNode(n, m) {
-			t.Error(err)
+			t.Errorf("%s == %s", n, m)
 		}
 	}
 }
@@ -797,21 +819,52 @@ func TestJSON2Go(t *testing.T) {
 			Bool bool   `json:"a,"`
 			This int    `json:",omitempty"`
 		}{Str: "false", Bool: true, This: 5}},
+		{`{"a":true,"bool":false}`, &struct {
+			Str  string `json:"bool,string"`
+			Bool bool   `json:"a,"`
+			This int    `json:",omitempty"`
+		}{}, struct {
+			Str  string `json:"bool,string"`
+			Bool bool   `json:"a,"`
+			This int    `json:",omitempty"` // err
+		}{Str: "false", Bool: true}},
+		{`{"str":true}`, &struct {
+			Str string `json:",string"`
+		}{}, struct {
+			Str string `json:",string"`
+		}{Str: "true"}},
+		{`{"str":true}`, &struct {
+			str string `json:",string"`
+		}{}, struct {
+			str string `json:",string"`
+		}{}},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		n, err := parse(lex(strings.NewReader(test.have)))
 		if err != nil {
 			t.Fatalf("test setup fail: %v", err)
 		}
 		err = n.JSON2Go(test.store)
 		if err != nil {
-			t.Error(err)
+			t.Error(i, err)
 			continue
 		}
 		got := reflect.ValueOf(test.store).Elem().Interface()
 		if !reflect.DeepEqual(got, test.want) {
 			t.Errorf("want %v got %v", test.want, got)
 		}
+	}
+}
+
+func TestCopy(t *testing.T) {
+	n, err := NewJSONString(`{"a": ["hello", false], "b": "yes"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := n.Copy()
+	m.SetChild(StandaloneNode("a.1", "true"))
+	if EqNode(n, m) {
+		t.Errorf("%s != %s", n, m)
 	}
 }
 

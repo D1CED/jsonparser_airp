@@ -76,7 +76,7 @@ func EqNode(a, b *Node) bool {
 			return false
 		}
 		for i := range an {
-			if m, ok := b.GetChild(an[i].Key); !ok && !EqNode(an[i].Node, m) {
+			if m, ok := b.GetChild(an[i].Key); !ok || !EqNode(an[i].Node, m) {
 				return false
 			}
 		}
@@ -104,7 +104,6 @@ func NewJSONString(s string) (*Node, error) {
 
 // NewJSONGo reads in a Go-value and generates a json ast that can be
 // manipulated easily.
-// TODO(JMH): add support for struct-tag options string and omitempty
 func NewJSONGo(val interface{}) (*Node, error) {
 	if val == nil {
 		return &Node{jsonType: Null}, nil
@@ -158,19 +157,33 @@ func NewJSONGo(val interface{}) (*Node, error) {
 	case reflect.Struct:
 		nn := []KeyNode(nil)
 		t := v.Type()
+	outer:
 		for i := 0; i < v.NumField(); i++ {
 			if r, _ := utf8.DecodeRuneInString(t.Field(i).Name); !unicode.IsUpper(r) {
 				continue
 			}
-			n, err := NewJSONGo(v.Field(i).Interface())
-			if err != nil {
-				return nil, err
-			}
 			elemT := t.Field(i)
 			tags := strings.Split(elemT.Tag.Get("json"), ",")
 			key := tags[0]
+			if key == "-" {
+				continue
+			}
 			if key == "" {
 				key = elemT.Name
+			}
+			iVal := v.Field(i)
+			for _, tag := range tags[1:] {
+				if tag == "omitempty" &&
+					iVal.Interface() == reflect.Zero(iVal.Type()).Interface() {
+					continue outer
+				}
+				if tag == "string" {
+					iVal = reflect.ValueOf(fmt.Sprint(iVal.Interface()))
+				}
+			}
+			n, err := NewJSONGo(iVal.Interface())
+			if err != nil {
+				return nil, err
 			}
 			nn = append(nn, KeyNode{key, n})
 		}
@@ -489,8 +502,34 @@ func (n *Node) GetChildrenKeys() []string {
 	}
 }
 
-// TODO(JMH): implement
-func (n *Node) Copy() *Node { return nil }
+// Copy creates a deep copy of a Node.
+func (n *Node) Copy() *Node {
+	switch n.jsonType {
+	case Null, Bool, Number, String:
+		return &Node{jsonType: n.jsonType, value: n.value}
+	case Array:
+		nn := n.value.([]*Node)
+		mm := make([]*Node, len(nn))
+		o := &Node{jsonType: Array, value: mm}
+		for i, m := range nn {
+			mm[i] = m.Copy()
+			mm[i].parent = o
+		}
+		return o
+	case Object:
+		kn := n.value.([]KeyNode)
+		mm := make([]KeyNode, len(kn))
+		o := &Node{jsonType: Object, value: mm}
+		for i, m := range kn {
+			mm[i].Key = m.Key
+			mm[i].Node = m.Copy()
+			mm[i].parent = o
+		}
+		return o
+	default:
+		return nil
+	}
+}
 
 // Len gives the length of an array or items in an object
 func (n *Node) Len() int {
@@ -714,18 +753,33 @@ func json2Go(n *Node, val interface{}, stringify bool) (err error) {
 				key = elemT.Name
 			}
 			elm, ok := n.GetChild(key)
-			if !ok {
-				omitempty := false
-				for _, tag := range tags[1:] {
-					if tag == "omitempty" {
-						omitempty = true
+			// case insensitive match without struct tag-name
+			if !ok && tags[0] == "" {
+				keys := n.GetChildrenKeys()
+				ss := make([]string, len(keys))
+				for i, k := range keys {
+					ss[i] = strings.ToUpper(k)
+				}
+				for i, s := range ss {
+					if s == strings.ToUpper(key) {
+						key = keys[i]
 						break
 					}
 				}
-				if omitempty {
-					continue
+				elm, ok = n.GetChild(key)
+			}
+			omitempty := false
+			for _, tag := range tags[1:] {
+				if tag == "omitempty" {
+					omitempty = true
+					break
 				}
-				return fmt.Errorf("key in json missing")
+			}
+			// return if not found and not omitempty
+			if !ok && omitempty {
+				continue
+			} else if !ok {
+				return fmt.Errorf("key \"%s\" in json missing %t", key, omitempty)
 			}
 			strfy := false
 			for _, tag := range tags[1:] {
