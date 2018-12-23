@@ -8,7 +8,7 @@ import (
 var keyRegex = regexp.MustCompile(`[[:alpha:]][[:word:]:\-]*`)
 
 // parser is a state machine creating an ast from lex tokens
-// the parser is only allowed to cancel it if recieves an error from the lexer
+// the parser is only allowed to cancel it if receives an error from the lexer
 type parser struct {
 	in     <-chan token
 	quitIn func()

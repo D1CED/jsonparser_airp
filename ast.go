@@ -654,7 +654,7 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 			buf = append(buf, "<error>"...)
 			return nil
 		default:
-			return fmt.Errorf("node of unkown type: %#v", m)
+			return fmt.Errorf("node of unknown type: %#v", m)
 		}
 	}
 	err := inner(0)
@@ -727,7 +727,7 @@ func json2Go(n *Node, val interface{}, stringify bool) (err error) {
 				case string:
 					err = fmt.Errorf(val)
 				default:
-					err = fmt.Errorf("incomparible types in array")
+					err = fmt.Errorf("incompatible types in array")
 				}
 			}
 		}()
@@ -806,7 +806,7 @@ func json2Go(n *Node, val interface{}, stringify bool) (err error) {
 				case string:
 					err = fmt.Errorf(val)
 				default:
-					err = fmt.Errorf("incomparible types in array")
+					err = fmt.Errorf("incompatible types in array")
 				}
 			}
 		}()

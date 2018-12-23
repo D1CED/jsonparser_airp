@@ -633,7 +633,7 @@ func TestLexQuit(t *testing.T) {
 	}
 	<-lexc // empty channel (length 1)
 	if _, ok := <-lexc; ok {
-		t.Error("lexer not stopped after recieving quit")
+		t.Error("lexer not stopped after receiving quit")
 	}
 }
 

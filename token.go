@@ -72,7 +72,7 @@ func (t token) String() string {
 	case errToken:
 		return "<err " + t.value + ">"
 	default:
-		return "<unkown " + t.value + ">"
+		return "<unknown " + t.value + ">"
 	}
 }
 

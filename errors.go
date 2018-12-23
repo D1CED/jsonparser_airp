@@ -46,7 +46,7 @@ func (e *ParseError) Error() string {
 		e.token.Error(), e.msg, e.before.String(), e.key, e.parentType)
 }
 
-// Where returns the row and column where the syntax error in json occured.
+// Where returns the row and column where the syntax error in json occurred.
 func (e *ParseError) Where() (row, col int) {
 	return e.token.position[0], e.token.position[1]
 }
