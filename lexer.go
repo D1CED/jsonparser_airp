@@ -93,8 +93,11 @@ func stringMode(l *lexer) lexFunc {
 		err := escape(l)
 		if err != nil {
 			lexSend(l, nil, token{
-				value:    l.buf.String(),
-				position: [2]int{l.row, l.col - utf8.RuneCount(l.buf.Bytes()) - 1},
+				value: l.buf.String(),
+				position: [2]int{
+					l.row,
+					l.col - utf8.RuneCount(l.buf.Bytes()) - 1,
+				},
 			})
 			return nil
 		}

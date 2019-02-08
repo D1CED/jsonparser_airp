@@ -16,15 +16,18 @@ func TestLexer(t *testing.T) {
 	tests := []struct {
 		have string
 		want []token
-	}{
-		{`{"a": null}`, []token{
+	}{{
+		`{"a": null}`,
+		[]token{
 			{Type: objectOToken, position: [2]int{0, 0}},
 			{Type: stringToken, value: "a", position: [2]int{0, 1}},
 			{Type: colonToken, position: [2]int{0, 4}},
 			{Type: nullToken, position: [2]int{0, 6}},
 			{Type: objectCToken, position: [2]int{0, 10}},
-		}},
-		{`[false, -31.2, 5, "ab\"cd"]`, []token{
+		},
+	}, {
+		`[false, -31.2, 5, "ab\"cd"]`,
+		[]token{
 			{Type: arrayOToken, position: [2]int{0, 0}},
 			{Type: falseToken, position: [2]int{0, 1}},
 			{Type: commaToken, position: [2]int{0, 6}},
@@ -34,8 +37,10 @@ func TestLexer(t *testing.T) {
 			{Type: commaToken, position: [2]int{0, 16}},
 			{Type: stringToken, value: "ab\\\"cd", position: [2]int{0, 18}},
 			{Type: arrayCToken, position: [2]int{0, 26}},
-		}},
-		{`{"a": 20, "b": [true, null]}`, []token{
+		},
+	}, {
+		`{"a": 20, "b": [true, null]}`,
+		[]token{
 			{Type: objectOToken, position: [2]int{0, 0}},
 			{Type: stringToken, value: "a", position: [2]int{0, 1}},
 			{Type: colonToken, position: [2]int{0, 4}},
@@ -49,13 +54,17 @@ func TestLexer(t *testing.T) {
 			{Type: nullToken, position: [2]int{0, 22}},
 			{Type: arrayCToken, position: [2]int{0, 26}},
 			{Type: objectCToken, position: [2]int{0, 27}},
-		}},
-		{`[0]`, []token{
+		},
+	}, {
+		`[0]`,
+		[]token{
 			{Type: arrayOToken, position: [2]int{0, 0}},
 			{Type: numberToken, value: "0", position: [2]int{0, 1}},
 			{Type: arrayCToken, position: [2]int{0, 2}},
-		}},
-		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, []token{
+		},
+	}, {
+		`{"a":{},"b":[],"c":null,"d":0,"e":""}`,
+		[]token{
 			{Type: objectOToken, position: [2]int{0, 0}},
 			{Type: stringToken, value: "a", position: [2]int{0, 1}},
 			{Type: colonToken, position: [2]int{0, 4}},
@@ -79,8 +88,10 @@ func TestLexer(t *testing.T) {
 			{Type: colonToken, position: [2]int{0, 33}},
 			{Type: stringToken, position: [2]int{0, 34}},
 			{Type: objectCToken, position: [2]int{0, 36}},
-		}},
-		{`{"index":[{"inner":[null,true]}}]`, []token{
+		},
+	}, {
+		`{"index":[{"inner":[null,true]}}]`,
+		[]token{
 			{Type: objectOToken, position: [2]int{0, 0}},
 			{Type: stringToken, value: "index", position: [2]int{0, 1}},
 			{Type: colonToken, position: [2]int{0, 8}},
@@ -96,8 +107,8 @@ func TestLexer(t *testing.T) {
 			{Type: objectCToken, position: [2]int{0, 30}},
 			{Type: objectCToken, position: [2]int{0, 31}},
 			{Type: arrayCToken, position: [2]int{0, 32}},
-		}},
-	}
+		},
+	}}
 outer:
 	for _, test := range tests {
 		lexc, q := lex(strings.NewReader(test.have))
@@ -119,24 +130,31 @@ func TestLexeErr(t *testing.T) {
 	tests := []struct {
 		have string
 		want token
-	}{
-		{`{"a": nul}`, token{
+	}{{
+		`{"a": nul}`,
+		token{
 			value:    "nul",
 			position: [2]int{0, 6},
-		}},
-		{`{"a": "\"}`, token{
+		},
+	}, {
+		`{"a": "\"}`,
+		token{
 			value:    `"\"}`,
 			position: [2]int{0, 6},
-		}},
-		{`{"a". false}`, token{
+		},
+	}, {
+		`{"a". false}`,
+		token{
 			value:    ".",
 			position: [2]int{0, 4},
-		}},
-		{"{\"a\"\n <garbage>}", token{
+		},
+	}, {
+		"{\"a\"\n <garbage>}",
+		token{
 			value:    "<garbage>",
 			position: [2]int{1, 1},
-		}},
-	}
+		},
+	}}
 	for _, test := range tests {
 		var have token
 		lexc, _ := lex(strings.NewReader(test.have))
@@ -153,14 +171,17 @@ func TestParser(t *testing.T) {
 	tests := []struct {
 		have string
 		want Node
-	}{
-		{`{"a": null}`, Node{
+	}{{
+		`{"a": null}`,
+		Node{
 			jsonType: Object,
 			value: []KeyNode{
 				{"a", &Node{jsonType: Null}},
 			},
-		}},
-		{`[false, -31.2, 5, "ab\"cd"]`, Node{
+		},
+	}, {
+		`[false, -31.2, 5, "ab\"cd"]`,
+		Node{
 			jsonType: Array,
 			value: []*Node{
 				{jsonType: Bool, value: false},
@@ -168,8 +189,10 @@ func TestParser(t *testing.T) {
 				{jsonType: Number, value: 5.},
 				{jsonType: String, value: "ab\\\"cd"},
 			},
-		}},
-		{`{"a": 20, "b": [true, null]}`, Node{
+		},
+	}, {
+		`{"a": 20, "b": [true, null]}`,
+		Node{
 			jsonType: Object,
 			value: []KeyNode{
 				{"a", &Node{jsonType: Number, value: 20.}},
@@ -178,14 +201,18 @@ func TestParser(t *testing.T) {
 					{jsonType: Null},
 				}}},
 			},
-		}},
-		{`[0]`, Node{
+		},
+	}, {
+		`[0]`,
+		Node{
 			jsonType: Array,
 			value: []*Node{
 				{jsonType: Number, value: 0.},
 			},
-		}},
-		{`{"a":{},"b":[],"c":null,"d":0,"e":""}`, Node{
+		},
+	}, {
+		`{"a":{},"b":[],"c":null,"d":0,"e":""}`,
+		Node{
 			jsonType: Object,
 			value: []KeyNode{
 				{"a", &Node{jsonType: Object, value: []KeyNode(nil)}},
@@ -194,8 +221,8 @@ func TestParser(t *testing.T) {
 				{"d", &Node{jsonType: Number, value: 0.}},
 				{"e", &Node{jsonType: String, value: ""}},
 			},
-		}},
-	}
+		},
+	}}
 	for i, test := range tests {
 		ast, err := parse(lex(strings.NewReader(test.have)))
 		if err != nil || !EqNode(ast, &test.want) {
@@ -208,85 +235,110 @@ func TestParseErr(t *testing.T) {
 	tests := []struct {
 		have string
 		want ParseError
-	}{
-		{"", ParseError{msg: "value"}},
-		{"null 5", ParseError{
+	}{{
+		"",
+		ParseError{msg: "value"},
+	}, {
+		"null 5",
+		ParseError{
 			msg:    "delimiter",
 			token:  token{Type: numberToken, value: "5", position: [2]int{0, 5}},
 			before: token{Type: nullToken, position: [2]int{0, 0}},
-		}},
-		{`{"a": nul}`, ParseError{
+		},
+	}, {
+		`{"a": nul}`,
+		ParseError{
 			msg:        "value",
 			token:      token{value: "nul", position: [2]int{0, 6}},
 			before:     token{Type: colonToken, position: [2]int{0, 4}},
 			parentType: Object,
 			key:        "a",
-		}},
-		{`{"a": null`, ParseError{
+		},
+	}, {
+		`{"a": null`,
+		ParseError{
 			msg:        "delimiter",
 			token:      token{Type: nullToken, position: [2]int{0, 6}},
 			before:     token{Type: nullToken, position: [2]int{0, 6}},
 			parentType: Object,
 			key:        "a",
-		}},
-		{`{"b": "\"}`, ParseError{
+		},
+	}, {
+		`{"b": "\"}`,
+		ParseError{
 			msg:        "value",
 			token:      token{value: `"\"}`, position: [2]int{0, 6}},
 			before:     token{Type: colonToken, position: [2]int{0, 4}},
 			parentType: Object,
 			key:        "b",
-		}},
-		{`{"a":[],"b":{"a". false}}`, ParseError{
+		},
+	}, {
+		`{"a":[],"b":{"a". false}}`,
+		ParseError{
 			msg:        "colon",
 			token:      token{value: ".", position: [2]int{0, 16}},
 			before:     token{Type: stringToken, value: "a", position: [2]int{0, 13}},
 			parentType: Object,
 			key:        "b.a",
-		}},
-		{"{\"very_long\"\n <garbage>}", ParseError{
+		},
+	}, {
+		"{\"very_long\"\n <garbage>}",
+		ParseError{
 			msg:        "colon",
 			token:      token{value: "<garbage>", position: [2]int{1, 1}},
 			before:     token{Type: stringToken, value: "very_long", position: [2]int{0, 1}},
 			parentType: Object,
 			key:        "very_long",
-		}},
-		{"{", ParseError{
+		},
+	}, {
+		"{",
+		ParseError{
 			msg:        "key",
 			before:     token{Type: objectOToken, position: [2]int{0, 0}},
 			parentType: Object,
-		}},
-		{`[{"b":}]`, ParseError{
+		},
+	}, {
+		`[{"b":}]`,
+		ParseError{
 			msg:        "value",
 			token:      token{Type: objectCToken, position: [2]int{0, 6}},
 			before:     token{Type: colonToken, position: [2]int{0, 5}},
 			parentType: Object,
 			key:        "0.b",
-		}},
-		{`[{"b":true},false,5.2,]`, ParseError{
+		},
+	}, {
+		`[{"b":true},false,5.2,]`,
+		ParseError{
 			msg:        "value",
 			token:      token{Type: arrayCToken, position: [2]int{0, 22}},
 			before:     token{Type: commaToken, position: [2]int{0, 21}},
 			parentType: Array,
 			key:        "3",
-		}},
-		{`abcdefghij`, ParseError{
+		},
+	}, {
+		`abcdefghij`,
+		ParseError{
 			msg:   "value",
 			token: token{value: "abcdefghij", position: [2]int{0, 0}},
-		}},
-		{`{"index":[{"inner":[null,true]}}]`, ParseError{
+		},
+	}, {
+		`{"index":[{"inner":[null,true]}}]`,
+		ParseError{
 			msg:        "array closing",
 			token:      token{Type: objectCToken, position: [2]int{0, 31}},
 			before:     token{Type: objectCToken, position: [2]int{0, 30}},
 			parentType: Array,
 			key:        "index.0",
-		}},
-		{`{"a":null,"a":true}`, ParseError{
+		},
+	}, {
+		`{"a":null,"a":true}`,
+		ParseError{
 			msg:        "unique key",
 			parentType: Object,
 			token:      token{Type: stringToken, value: "a", position: [2]int{0, 10}},
 			before:     token{Type: commaToken, position: [2]int{0, 9}},
-		}},
-	}
+		},
+	}}
 	for _, test := range tests {
 		_, err := parse(lex(strings.NewReader(test.have)))
 		pErr, ok := err.(*ParseError)
@@ -304,28 +356,47 @@ func TestGetKey(t *testing.T) {
 		json  string
 		key   string
 		value interface{}
-	}{
-		{`[true]`, "0", true},
-		{`[true, 25]`, "1", 25.},
-		{`{"a":true}`, "a", true},
-		{`{"long":5,"a":true}`, "a", true},
-		{`{"long":5,"a":true}`, "long", 5.},
-		{`[{"long":5,"a":true},{"hi":"yes"}]`, "1.hi", "yes"},
-		{`{"long":[5,null],"a":true}`, "a", true},
-		{`[[[["inner"]]]]`, "0.0.0.0", "inner"},
-		{`[[null,[null,null,["inner"]]]]`, "0.1.2.0", "inner"},
-		{`{"a":{"a":{"a":{"a":"inner"}}}}`, "a.a.a.a", "inner"},
-		{`{"a":{"a":null,"b":{"a":null,"b":null,"c":{"a":"inner"}}}}`, "a.b.c.a", "inner"},
-		{`{"a":[5]}`, "a.0", 5.},
-		{`[{"a":5}]`, "0.a", 5.},
-		{`{"a":[5,"hi"]}`, "a.1", "hi"},
-		{`[[1],null]`, "0.0", 1.}, // MWE
-		{`[null,[1],null]`, "1.0", 1.},
-		{`{"a":{"c":5},"b":"hi"}`, "a.c", 5.},
-		{`{"a":[5],"b":"hi"}`, "a.0", 5.},
-		{`{"long":[5,null],"a":true}`, "long.1", nil},
-		{`{"go":[{"long":[5,null],"a":true}]}`, "go.0.long.1", nil},
-	}
+	}{{
+		`[true]`, "0", true,
+	}, {
+		`[true, 25]`, "1", 25.,
+	}, {
+		`{"a":true}`, "a", true,
+	}, {
+		`{"long":5,"a":true}`, "a", true,
+	}, {
+		`{"long":5,"a":true}`, "long", 5.,
+	}, {
+		`[{"long":5,"a":true},{"hi":"yes"}]`, "1.hi", "yes",
+	}, {
+		`{"long":[5,null],"a":true}`, "a", true,
+	}, {
+		`[[[["inner"]]]]`, "0.0.0.0", "inner",
+	}, {
+		`[[null,[null,null,["inner"]]]]`, "0.1.2.0", "inner",
+	}, {
+		`{"a":{"a":{"a":{"a":"inner"}}}}`, "a.a.a.a", "inner",
+	}, {
+		`{"a":{"a":null,"b":{"a":null,"b":null,"c":{"a":"inner"}}}}`, "a.b.c.a", "inner",
+	}, {
+		`{"a":[5]}`, "a.0", 5.,
+	}, {
+		`[{"a":5}]`, "0.a", 5.,
+	}, {
+		`{"a":[5,"hi"]}`, "a.1", "hi",
+	}, {
+		`[[1],null]`, "0.0", 1.,
+	}, {
+		`[null,[1],null]`, "1.0", 1.,
+	}, {
+		`{"a":{"c":5},"b":"hi"}`, "a.c", 5.,
+	}, {
+		`{"a":[5],"b":"hi"}`, "a.0", 5.,
+	}, {
+		`{"long":[5,null],"a":true}`, "long.1", nil,
+	}, {
+		`{"go":[{"long":[5,null],"a":true}]}`, "go.0.long.1", nil,
+	}}
 	for i, test := range tests {
 		n, err := NewJSONString(test.json)
 		if err != nil {
@@ -519,15 +590,16 @@ func TestValue(t *testing.T) {
 	tests := []struct {
 		have string
 		want interface{}
-	}{
-		{`{"a": null}`, map[string]interface{}{"a": nil}},
-		{`[false, -31.2, 5, "ab\"cd"]`, []interface{}{
-			false, -31.2, 5., "ab\\\"cd",
-		}},
-		{`{"a": 20, "b": [true, null]}`, map[string]interface{}{
-			"a": 20., "b": []interface{}{true, nil},
-		}},
-	}
+	}{{
+		`{"a": null}`,
+		map[string]interface{}{"a": nil},
+	}, {
+		`[false, -31.2, 5, "ab\"cd"]`,
+		[]interface{}{false, -31.2, 5., "ab\\\"cd"},
+	}, {
+		`{"a": 20, "b": [true, null]}`,
+		map[string]interface{}{"a": 20., "b": []interface{}{true, nil}},
+	}}
 	for _, test := range tests {
 		ast, _ := parse(lex(strings.NewReader(test.have)))
 		itf, err := ast.Value()
@@ -544,14 +616,17 @@ func TestASTStringer(t *testing.T) {
 	tests := []struct {
 		want string
 		have Node
-	}{
-		{`{"a":null}`, Node{
+	}{{
+		`{"a":null}`,
+		Node{
 			jsonType: Object,
 			value: []KeyNode{
 				{"a", &Node{jsonType: Null}},
 			},
-		}},
-		{`[false,-31.2,5,"ab\"cd"]`, Node{
+		},
+	}, {
+		`[false,-31.2,5,"ab\"cd"]`,
+		Node{
 			jsonType: Array,
 			value: []*Node{
 				{jsonType: Bool, value: false},
@@ -559,8 +634,10 @@ func TestASTStringer(t *testing.T) {
 				{jsonType: Number, value: float64(5)},
 				{jsonType: String, value: "ab\\\"cd"},
 			},
-		}},
-		{`{"a":20,"b":[true,null]}`, Node{
+		},
+	}, {
+		`{"a":20,"b":[true,null]}`,
+		Node{
 			jsonType: Object,
 			value: []KeyNode{
 				{"a", &Node{jsonType: Number, value: float64(20)}},
@@ -569,8 +646,8 @@ func TestASTStringer(t *testing.T) {
 					{jsonType: Null},
 				}}},
 			},
-		}},
-	}
+		},
+	}}
 	for _, test := range tests {
 		got := test.have.String()
 		if got != test.want {
@@ -583,14 +660,17 @@ func TestASTStringerDebug(t *testing.T) {
 	tests := []struct {
 		want string
 		have Node
-	}{
-		{`{~!"a":^null~}`, Node{
+	}{{
+		`{~!"a":^null~}`,
+		Node{
 			jsonType: Object,
 			value: []KeyNode{
 				{"a", &Node{jsonType: Null}},
 			},
-		}},
-		{`[~!false,-~!-31.2,-~!5,-~!"ab\"cd"~]`, Node{
+		},
+	}, {
+		`[~!false,-~!-31.2,-~!5,-~!"ab\"cd"~]`,
+		Node{
 			jsonType: Array,
 			value: []*Node{
 				{jsonType: Bool, value: false},
@@ -598,8 +678,10 @@ func TestASTStringerDebug(t *testing.T) {
 				{jsonType: Number, value: float64(5)},
 				{jsonType: String, value: "ab\\\"cd"},
 			},
-		}},
-		{`{~!"a":^20,-~!"b":^[~!!true,-~!!null~!]~}`, Node{
+		},
+	}, {
+		`{~!"a":^20,-~!"b":^[~!!true,-~!!null~!]~}`,
+		Node{
 			jsonType: Object,
 			value: []KeyNode{
 				{"a", &Node{jsonType: Number, value: float64(20)}},
@@ -608,8 +690,8 @@ func TestASTStringerDebug(t *testing.T) {
 					{jsonType: Null},
 				}}},
 			},
-		}},
-	}
+		},
+	}}
 	for _, test := range tests {
 		b := &strings.Builder{}
 		test.have.format(b, "!", "~", "-", "^")
@@ -645,51 +727,77 @@ func TestNewJSONGo(t *testing.T) {
 	tests := []struct {
 		have interface{}
 		want string
-	}{
-		{nil, "null"},
-		{true, "true"},
-		{5, "5"},
-		{myType(550022), "550022"},
-		{5., "5"},
-		{"Hello, World!", `"Hello, World!"`},
-		{[...]int{1, 2, 3, 4}, "[1,2,3,4]"},
-		{[]interface{}{nil, true, 3, "hi"}, `[null,true,3,"hi"]`},
-		{map[string]interface{}{"bb": false}, `{"bb":false}`},
-		{struct {
+	}{{
+		nil, "null",
+	}, {
+		true, "true",
+	}, {
+		5, "5",
+	}, {
+		myType(550022), "550022",
+	}, {
+		5., "5",
+	}, {
+		"Hello, World!", `"Hello, World!"`,
+	}, {
+		[...]int{1, 2, 3, 4}, "[1,2,3,4]",
+	}, {
+		[]interface{}{nil, true, 3, "hi"}, `[null,true,3,"hi"]`,
+	}, {
+		map[string]interface{}{"bb": false}, `{"bb":false}`,
+	}, {
+		struct {
 			Integer int
 			a       string
-		}{20, "aa"}, `{"Integer":20}`},
-		{struct {
+		}{20, "aa"},
+		`{"Integer":20}`,
+	}, {
+		struct {
 			Integer uint `json:"int"`
 			a       string
-		}{20, "aa"}, `{"int":20}`},
-		{struct {
+		}{20, "aa"},
+		`{"int":20}`,
+	}, {
+		struct {
 			Integer int `json:"-"`
 			A       string
-		}{20, "aa"}, `{"A":"aa"}`},
-		{struct {
+		}{20, "aa"},
+		`{"A":"aa"}`,
+	}, {
+		struct {
 			Integer int    `json:",omitempty"`
 			A       string `json:"omitempty"`
-		}{0, "aa"}, `{"omitempty":"aa"}`},
-		{struct {
+		}{0, "aa"},
+		`{"omitempty":"aa"}`,
+	}, {
+		struct {
 			Integer int    `json:",omitempty"`
 			A       string `json:"omitempty"`
-		}{1, "aa"}, `{"Integer":1,"omitempty":"aa"}`},
-		{struct {
+		}{1, "aa"},
+		`{"Integer":1,"omitempty":"aa"}`,
+	}, {
+		struct {
 			Integer int    `json:",omitempty,string"`
 			A       string `json:"a-b,"`
-		}{1, "aa"}, `{"Integer":"1","a-b":"aa"}`},
-		{struct {
+		}{1, "aa"},
+		`{"Integer":"1","a-b":"aa"}`,
+	}, {
+		struct {
 			Integer int64  `json:",string"`
 			A       string `json:"string"`
-		}{0, "aa"}, `{"Integer":"0","string":"aa"}`},
-		{&struct {
+		}{0, "aa"},
+		`{"Integer":"0","string":"aa"}`,
+	}, {
+		&struct {
 			Integer *int `json:"intptr"`
 			a       string
-		}{intPtr, "aa"}, `{"intptr":50}`},
-		{&[...]uint64{6}, "[6]"},
-		{[]byte("bytes"), `"bytes"`},
-	}
+		}{intPtr, "aa"},
+		`{"intptr":50}`,
+	}, {
+		&[...]uint64{6}, "[6]",
+	}, {
+		[]byte("bytes"), `"bytes"`,
+	}}
 	for _, test := range tests {
 		n, err := NewJSONGo(test.have)
 		if err != nil {
@@ -707,14 +815,19 @@ func TestGetChild(t *testing.T) {
 		key   string
 		want  bool
 		value string
-	}{
-		{`[null,5,"hello there"]`, "2", true, `"hello there"`},
-		{`{"a":null,"b":5,"json":"hello there"}`, "json", true, `"hello there"`},
-		{`{"index":{"inner":[true]}}`, "index.inner.0", true, "true"},
-		{`{"index":[{"inner":[null,true]}]}`, "index.inner.0", false, ""},
-		{`{"index":[{"inner":[null,true]}]}`, "index.0.inner.1", true, "true"},
-		{`{"index":{"inner":[true]}}`, "index.iner.0", false, ""},
-	}
+	}{{
+		`[null,5,"hello there"]`, "2", true, `"hello there"`,
+	}, {
+		`{"a":null,"b":5,"json":"hello there"}`, "json", true, `"hello there"`,
+	}, {
+		`{"index":{"inner":[true]}}`, "index.inner.0", true, "true",
+	}, {
+		`{"index":[{"inner":[null,true]}]}`, "index.inner.0", false, "",
+	}, {
+		`{"index":[{"inner":[null,true]}]}`, "index.0.inner.1", true, "true",
+	}, {
+		`{"index":{"inner":[true]}}`, "index.iner.0", false, "",
+	}}
 	for _, test := range tests {
 		n, err := parse(lex(strings.NewReader(test.json)))
 		if err != nil {
@@ -732,17 +845,23 @@ func TestEqNode(t *testing.T) {
 	tests := []struct {
 		goval interface{}
 		json  string
-	}{
-		{5, "5"},
-		{nil, "null"},
-		{"hello", `"hello"`},
-		{[]bool{false, true}, "[false, true]"},
-		{map[string]interface{}{
+	}{{
+		5, "5",
+	}, {
+		nil, "null",
+	}, {
+		"hello", `"hello"`,
+	}, {
+		[]bool{false, true}, "[false, true]",
+	}, {
+		map[string]interface{}{
 			"a":    true,
 			"long": 100000,
-		}, `{"long":100000,"a":true}`},
-		{[]interface{}{"hello", false}, `["hello",false]`},
-	}
+		},
+		`{"long":100000,"a":true}`,
+	}, {
+		[]interface{}{"hello", false}, `["hello",false]`,
+	}}
 	for _, test := range tests {
 		n, err := NewJSONGo(test.goval)
 		if err != nil {
@@ -762,12 +881,15 @@ func TestLen(t *testing.T) {
 	tests := []struct {
 		json string
 		len  int
-	}{
-		{"true", 1},
-		{"{}", 0},
-		{`{"a":5,"b":null}`, 2},
-		{"[1,2,3,4,5,6,7,8,9]", 9},
-	}
+	}{{
+		"true", 1,
+	}, {
+		"{}", 0,
+	}, {
+		`{"a":5,"b":null}`, 2,
+	}, {
+		"[1,2,3,4,5,6,7,8,9]", 9,
+	}}
 	for _, test := range tests {
 		n, err := NewJSONString(test.json)
 		if err != nil {
@@ -784,61 +906,89 @@ func TestJSON2Go(t *testing.T) {
 		have  string
 		store interface{}
 		want  interface{}
-	}{
-		{"true", new(bool), true},
-		{"52", new(int), 52},
-		{"3452.1", new(float64), 3452.1},
-		{"3452.1", new(float32), float32(3452.1)},
-		{`"Hello, World!"`, new(string), "Hello, World!"},
-		{`[true, "hi"]`, &[]interface{}{}, []interface{}{true, "hi"}},
-		{`[52, 420]`, &[]float64{}, []float64{52, 420}},
-		{`[52, 420]`, &[]int{}, []int{52, 420}},
-		{`{"a":52,"b":420}`, &map[string]int{}, map[string]int{"a": 52, "b": 420}},
-		{`{"a":52,"b":true}`, &struct {
+	}{{
+		"true", new(bool), true,
+	}, {
+		"52", new(int), 52,
+	}, {
+		"3452.1", new(float64), 3452.1,
+	}, {
+		"3452.1", new(float32), float32(3452.1),
+	}, {
+		`"Hello, World!"`, new(string), "Hello, World!",
+	}, {
+		`[true, "hi"]`, &[]interface{}{}, []interface{}{true, "hi"},
+	}, {
+		`[52, 420]`, &[]float64{}, []float64{52, 420},
+	}, {
+		`[52, 420]`, &[]int{}, []int{52, 420},
+	}, {
+		`{"a":52,"b":420}`,
+		&map[string]int{},
+		map[string]int{"a": 52, "b": 420},
+	}, {
+		`{"a":52,"b":true}`,
+		&struct {
 			A int  `json:"a"`
 			B bool `json:"b"`
-		}{}, struct {
+		}{},
+		struct {
 			A int  `json:"a"`
 			B bool `json:"b"`
-		}{52, true}},
-		{`{"Str":true,"bool":false,"This":5}`, &struct {
+		}{52, true},
+	}, {
+		`{"Str":true,"bool":false,"This":5}`,
+		&struct {
 			Str  string `json:",string"`
 			Bool bool   `json:"bool"`
 			This int    `json:"-"`
-		}{}, struct {
+		}{},
+		struct {
 			Str  string `json:",string"`
 			Bool bool   `json:"bool"`
 			This int    `json:"-"`
-		}{Str: "true", Bool: false}},
-		{`{"a":true,"bool":false,"This":5}`, &struct {
+		}{Str: "true", Bool: false},
+	}, {
+		`{"a":true,"bool":false,"This":5}`,
+		&struct {
 			Str  string `json:"bool,string"`
 			Bool bool   `json:"a,"`
 			This int    `json:",omitempty"`
-		}{}, struct {
+		}{},
+		struct {
 			Str  string `json:"bool,string"`
 			Bool bool   `json:"a,"`
 			This int    `json:",omitempty"`
-		}{Str: "false", Bool: true, This: 5}},
-		{`{"a":true,"bool":false}`, &struct {
+		}{Str: "false", Bool: true, This: 5},
+	}, {
+		`{"a":true,"bool":false}`,
+		&struct {
 			Str  string `json:"bool,string"`
 			Bool bool   `json:"a,"`
 			This int    `json:",omitempty"`
-		}{}, struct {
+		}{},
+		struct {
 			Str  string `json:"bool,string"`
 			Bool bool   `json:"a,"`
 			This int    `json:",omitempty"` // err
-		}{Str: "false", Bool: true}},
-		{`{"str":true}`, &struct {
+		}{Str: "false", Bool: true},
+	}, {
+		`{"str":true}`,
+		&struct {
 			Str string `json:",string"`
-		}{}, struct {
+		}{},
+		struct {
 			Str string `json:",string"`
-		}{Str: "true"}},
-		{`{"str":true}`, &struct {
+		}{Str: "true"},
+	}, {
+		`{"str":true}`,
+		&struct {
 			str string `json:",string"`
-		}{}, struct {
+		}{},
+		struct {
 			str string `json:",string"`
-		}{}},
-	}
+		}{},
+	}}
 	for i, test := range tests {
 		n, err := parse(lex(strings.NewReader(test.have)))
 		if err != nil {
@@ -869,9 +1019,11 @@ func TestCopy(t *testing.T) {
 }
 
 func TestEscape(t *testing.T) {
-	tests := []struct{ name, have, want string }{
-		{"c", `"ab\u0063"`, `"abc"`},
-	}
+	tests := []struct {
+		name, have, want string
+	}{{
+		"c", `"ab\u0063"`, `"abc"`,
+	}}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			n, err := NewJSONString(test.have)
