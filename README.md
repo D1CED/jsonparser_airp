@@ -1,4 +1,4 @@
-# jsonparser_airp
+# airp
 
 See doc.go and use [`go doc github.com/D1CED/jsonparser_airp`](https://www.godoc.org/github.com/d1ced/jsonparser_airp).
 For usage look into 'example\_test.go'.

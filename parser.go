@@ -1,4 +1,4 @@
-package jsonparser_airp
+package airp
 
 import (
 	"regexp"
@@ -110,7 +110,7 @@ func expektValue(p *parser) (parseFunc, error) {
 		return expektDelim, nil
 	case arrayOToken:
 		p.ast.jsonType = Array
-		nn := make([]*Node, 1)
+		nn := make([]*Node, 1, 4)
 		nn[0] = new(Node)
 		nn[0].parent = p.ast
 		p.ast.value = nn
@@ -118,7 +118,7 @@ func expektValue(p *parser) (parseFunc, error) {
 		return expektValue, nil
 	case objectOToken:
 		p.ast.jsonType = Object
-		kn := make([]KeyNode, 1)
+		kn := make([]KeyNode, 1, 4)
 		kn[0].Node = new(Node)
 		kn[0].parent = p.ast
 		p.ast.value = kn

@@ -1,4 +1,4 @@
-package jsonparser_airp
+package airp
 
 import (
 	"bytes"
@@ -565,6 +565,17 @@ func (n *Node) Total() int {
 	}
 }
 
+// like bytes.Repeat but with a initial buffer
+func bytesRepeatBuf(buf []byte, rep string, num int) []byte {
+	if num < 0 {
+		panic("negative num value in bytesRepeatBuf")
+	}
+	for i := 0; i < num; i++ {
+		buf = append(buf, rep...)
+	}
+	return buf
+}
+
 // format writes a valid json representation to w with prefix as indent,
 // postfix after values or opening objects/arrays, colonSep after keys and
 // commaSep after each comma.
@@ -572,9 +583,11 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 	if n == nil {
 		return 0, fmt.Errorf("<nil>")
 	}
-	var inner func(int) error
-	var m, o = n, &Node{}
-	buf := make([]byte, 0, 64)
+	var (
+		inner func(int) error
+		m, o  *Node = n, nil
+		buf         = make([]byte, 0, 1024)
+	)
 	inner = func(level int) error { // closure with single buffer
 		if !isValid(m) {
 			return fmt.Errorf("format; assertion failure")
@@ -591,7 +604,7 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 			buf = append(buf, "false"...)
 			return nil
 		case Number:
-			buf = append(buf, fmt.Sprint(m.value.(float64))...)
+			buf = strconv.AppendFloat(buf, m.value.(float64), 'g', -1, 64)
 			return nil
 		case String:
 			buf = append(buf, (`"` + m.value.(string) + `"`)...)
@@ -599,12 +612,13 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 		case Array:
 			cc := m.value.([]*Node)
 			if len(cc) == 0 {
-				buf = append(buf, (strings.Repeat(prefix, level) + "[]")...)
+				buf = bytesRepeatBuf(buf, prefix, level)
+				buf = append(buf, "[]"...)
 				return nil
 			}
 			buf = append(buf, ("[" + postfix)...)
 			for _, c := range cc[:len(cc)-1] {
-				buf = append(buf, strings.Repeat(prefix, level+1)...)
+				buf = bytesRepeatBuf(buf, prefix, level+1)
 				m, o = c, m
 				err := inner(level + 1)
 				if err != nil {
@@ -613,25 +627,30 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 				m = o
 				buf = append(buf, ("," + commaSep + postfix)...)
 			}
-			buf = append(buf, strings.Repeat(prefix, level+1)...)
+			buf = bytesRepeatBuf(buf, prefix, level+1)
 			m, o = cc[len(cc)-1], m
 			err := inner(level + 1)
 			if err != nil {
 				return err
 			}
 			m = o
-			buf = append(buf, (postfix + strings.Repeat(prefix, level) + "]")...)
+			buf = append(buf, postfix...)
+			buf = bytesRepeatBuf(buf, prefix, level)
+			buf = append(buf, ']')
 			return nil
 		case Object:
 			cc := m.value.([]KeyNode)
 			if len(cc) == 0 {
-				buf = append(buf, (strings.Repeat(prefix, level) + "{}")...)
+				buf = bytesRepeatBuf(buf, prefix, level)
+				buf = append(buf, "{}"...)
 				return nil
 			}
 			buf = append(buf, ("{" + postfix)...)
 			for _, c := range cc[:len(cc)-1] {
-				buf = append(buf, (strings.Repeat(prefix, level+1) +
-					"\"" + c.Key + "\":" + colonSep)...)
+
+				buf = bytesRepeatBuf(buf, prefix, level+1)
+				buf = append(buf, ("\"" + c.Key + "\":" + colonSep)...)
+
 				m, o = c.Node, m
 				err := inner(level + 1)
 				if err != nil {
@@ -640,15 +659,19 @@ func (n *Node) format(w io.Writer, prefix, postfix, commaSep, colonSep string) (
 				buf = append(buf, ("," + commaSep + postfix)...)
 				m = o
 			}
-			buf = append(buf, (strings.Repeat(prefix, level+1) + "\"" +
-				cc[len(cc)-1].Key + "\":" + colonSep)...)
+
+			buf = bytesRepeatBuf(buf, prefix, level+1)
+			buf = append(buf, ("\"" + cc[len(cc)-1].Key + "\":" + colonSep)...)
+
 			m, o = cc[len(cc)-1].Node, m
 			err := inner(level + 1)
 			if err != nil {
 				return err
 			}
 			m = o
-			buf = append(buf, (postfix + strings.Repeat(prefix, level) + "}")...)
+			buf = append(buf, postfix...)
+			buf = bytesRepeatBuf(buf, prefix, level)
+			buf = append(buf, "}"...)
 			return nil
 		case Error:
 			buf = append(buf, "<error>"...)

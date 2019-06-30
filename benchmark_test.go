@@ -1,6 +1,7 @@
-package jsonparser_airp
+package airp
 
 import (
+	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -13,7 +14,10 @@ func BenchmarkLexer(b *testing.B) {
 	0.53123[]{{{}null,,,,,,,,"hibas"::5::false[[{{}}       `
 	for i := 0; i < b.N; i++ {
 		lexc, _ := lex(strings.NewReader(input))
-		for range lexc {
+		for t := range lexc {
+			if t.Type == errToken {
+				b.Fatal(fmt.Sprintf("errounus token: %s", t))
+			}
 		}
 	}
 }
@@ -24,13 +28,14 @@ func BenchmarkParser(b *testing.B) {
 	"d":null,"e":true},{"a":[5,6,7,8],"b":"hi2","c":5.9,"d":{
 	"f":"Hello there!"},"e":false}]}}`
 	lexc, _ := lex(strings.NewReader(input))
-	var lexs []token
+	lexs := make([]token, 0, 512)
 	for tk := range lexc {
 		if tk.Type == errToken {
 			b.Fatal("non-valid token stream")
 		}
 		lexs = append(lexs, tk)
 	}
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		inpc := make(chan token, len(lexs))
@@ -38,6 +43,7 @@ func BenchmarkParser(b *testing.B) {
 			inpc <- tk
 		}
 		close(inpc)
+
 		_, err := parse(inpc, func() {})
 		if err != nil {
 			b.Fatalf("non-valid token stream: %v", err)

@@ -1,4 +1,4 @@
-package jsonparser_airp
+package airp
 
 import (
 	"bufio"
@@ -50,6 +50,7 @@ func lex(data io.Reader) (stream <-chan token, quit func()) {
 }
 
 func noneMode(l *lexer) lexFunc {
+start:
 	r, _, err := l.reader.ReadRune()
 	if err != nil {
 		return nil
@@ -58,13 +59,13 @@ func noneMode(l *lexer) lexFunc {
 	case '\n':
 		l.row++
 		l.col = 0
-		return noneMode
+		goto start
 	case '\r':
 		l.col = 0
-		return noneMode
+		goto start
 	case ' ', '\t':
 		l.col++
-		return noneMode
+		goto start
 	case '{', '}', '[', ']', ',', ':':
 		m := lexSend(l, noneMode, newToken(r, l.row, l.col))
 		l.col++
@@ -81,6 +82,7 @@ func noneMode(l *lexer) lexFunc {
 }
 
 func stringMode(l *lexer) lexFunc {
+start:
 	r, _, err := l.reader.ReadRune()
 	if err != nil {
 		lexSend(l, nil, token{
@@ -101,7 +103,7 @@ func stringMode(l *lexer) lexFunc {
 			})
 			return nil
 		}
-		return stringMode
+		goto start
 	}
 	if r == '"' {
 		m := lexSend(l, noneMode, token{
@@ -114,7 +116,7 @@ func stringMode(l *lexer) lexFunc {
 		return m
 	}
 	l.buf.WriteRune(r)
-	return stringMode
+	goto start
 }
 
 func otherMode(l *lexer) lexFunc {
@@ -192,6 +194,7 @@ errL:
 }
 
 func numberMode(l *lexer) lexFunc {
+start:
 	r, _, err := l.reader.ReadRune()
 	if err != nil {
 		lexSend(l, nil, token{
@@ -204,7 +207,7 @@ func numberMode(l *lexer) lexFunc {
 	switch r {
 	case '-', '+', 'e', 'E', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		l.buf.WriteRune(r)
-		return numberMode
+		goto start
 	default:
 		l.reader.UnreadRune()
 		lexSend(l, noneMode, token{

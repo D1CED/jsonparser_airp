@@ -1,4 +1,4 @@
-package jsonparser_airp_test
+package airp_test
 
 import (
 	"bytes"

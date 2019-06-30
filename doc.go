@@ -1,7 +1,7 @@
 // Jannis M. Hoffmann, 2018/09/13
 
 /*
-Package jsonparser_airp encodes and decodes JSON.
+Package airp encodes and decodes JSON.
 
 In contrast to encoding/json airp is centered around an AST (Abstract Syntax
 Tree) model. An AST can be manipulated and new nodes can be created.
@@ -19,4 +19,4 @@ Some differences between this package and encoding/json:
 TODO(JMH): better handle escape sequences
 TODO(JMH): reimplement lexer and parser
 */
-package jsonparser_airp // import "github.com/d1ced/jsonparser_airp"
+package airp // import "github.com/d1ced/jsonparser_airp"

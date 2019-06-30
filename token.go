@@ -1,4 +1,4 @@
-package jsonparser_airp
+package airp
 
 import "fmt"
 

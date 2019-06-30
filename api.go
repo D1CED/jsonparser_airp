@@ -1,4 +1,4 @@
-package jsonparser_airp
+package airp
 
 func Marshal(v interface{}) ([]byte, error) {
 	n, err := NewJSONGo(v)
