@@ -505,9 +505,9 @@ func TestFile(t *testing.T) {
 			}},
 		}}},
 	}}
-	data, err := ioutil.ReadFile("testfiles/test.json")
+	data, err := ioutil.ReadFile("testdata/test.json")
 	if err != nil {
-		t.Fatalf("failed reading golden file 'testfiles/test.json': %v", err)
+		t.Fatalf("failed reading golden file 'testdata/test.json': %v", err)
 	}
 	n, err := parse(lex(bytes.NewReader(data)))
 	if err != nil || !EqNode(want, n) {

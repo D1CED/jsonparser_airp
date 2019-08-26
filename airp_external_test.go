@@ -12,7 +12,7 @@ import (
 )
 
 func TestFile2(t *testing.T) {
-	f, err := os.Open("testfiles/json.org_example4.json")
+	f, err := os.Open("testdata/json.org_example4.json")
 	if err != nil {
 		t.Fatal(err)
 	}
